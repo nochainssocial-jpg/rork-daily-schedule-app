@@ -1,9 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Share as RNShare, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import type { Staff, Participant, Chore, TimeSlot } from '@/types/schedule';
-import { RefreshCw, AlertCircle, Share, FileText } from 'lucide-react-native';
+import { RefreshCw, AlertCircle, FileText } from 'lucide-react-native';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system';
 
 export default function ViewPDFScreen() {
   const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion } = useSchedule();
@@ -234,14 +236,30 @@ export default function ViewPDFScreen() {
         URL.revokeObjectURL(url);
         Alert.alert('Success', 'PDF file downloaded successfully!');
       } else {
-        // For mobile, share as text file attachment
-        await RNShare.share({
-          message: pdfText,
-          title: `Daily Schedule - ${(() => {
-            const [year, month, day] = selectedDate.split('-');
-            return `${day}/${month}/${year}`;
-          })()}`,
+        // For mobile, create a file and share it as an attachment
+        const fileUri = FileSystem.documentDirectory + fileName;
+        
+        // Write the text content to a file
+        await FileSystem.writeAsStringAsync(fileUri, pdfText, {
+          encoding: FileSystem.EncodingType.UTF8,
         });
+        
+        // Check if sharing is available
+        const isAvailable = await Sharing.isAvailableAsync();
+        
+        if (isAvailable) {
+          // Share the file as an attachment
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'text/plain',
+            dialogTitle: `Daily Schedule - ${(() => {
+              const [year, month, day] = selectedDate.split('-');
+              return `${day}/${month}/${year}`;
+            })()}`,
+            UTI: 'public.plain-text', // For iOS
+          });
+        } else {
+          Alert.alert('Sharing not available', 'File sharing is not available on this device.');
+        }
       }
     } catch (error) {
       console.log('Error sharing PDF:', error);
