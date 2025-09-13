@@ -6,7 +6,6 @@ import {
   Text, 
   TouchableOpacity,
   Image,
-  Alert,
   Animated,
   PanResponder
 } from 'react-native';
@@ -25,7 +24,9 @@ import {
   Car,
   ListChecks,
   Edit,
-  RotateCcw
+  RotateCcw,
+  Calendar,
+  Download
 } from 'lucide-react-native';
 
 export default function HomeScreen() {
@@ -36,13 +37,15 @@ export default function HomeScreen() {
     getScheduleForDate,
     categoryUpdates,
     refreshAllData,
-    schedules
+    schedules,
+    autoSaveSchedule
   } = useSchedule();
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
+  const [showScheduleBrowser, setShowScheduleBrowser] = useState<boolean>(false);
   
   // Pull to refresh animation values
   const pullDistance = useRef(new Animated.Value(0)).current;
@@ -405,7 +408,7 @@ export default function HomeScreen() {
 
   const handleSharePress = () => {
     if (!todaySchedule) {
-      Alert.alert('No Schedule', 'Please create a schedule first');
+      console.log('No schedule available for sharing');
       return;
     }
     router.push('/share-schedule');
@@ -413,7 +416,7 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (categoryId: string) => {
     if (!todaySchedule) {
-      Alert.alert('No Schedule', 'Please create a schedule for today first');
+      console.log('No schedule available - please create a schedule first');
       return;
     }
     
@@ -427,6 +430,89 @@ export default function HomeScreen() {
       pathname: '/edit-schedule',
       params: { category: categoryId }
     });
+  };
+
+  const handleLoadSchedule = async (schedule: any) => {
+    console.log('Loading schedule for date:', schedule.date);
+    
+    // Create a copy of the schedule for today's date
+    const loadedSchedule = {
+      ...schedule,
+      id: `schedule-${selectedDate}`,
+      date: selectedDate
+    };
+    
+    try {
+      // Save the loaded schedule as today's schedule
+      await autoSaveSchedule(loadedSchedule);
+      
+      setShowScheduleBrowser(false);
+      
+      // Show success message without Alert for web compatibility
+      console.log(`Schedule from ${schedule.date} has been loaded for today (${selectedDate})`);
+      
+      // Force refresh to show the loaded schedule
+      await refreshAllData();
+    } catch (error) {
+      console.error('Error loading schedule:', error);
+    }
+  };
+
+  const renderScheduleBrowser = () => {
+    if (!showScheduleBrowser) return null;
+
+    const availableSchedules = schedules.filter((s: any) => s.date !== selectedDate);
+
+    return (
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Load Previous Schedule</Text>
+            <TouchableOpacity 
+              onPress={() => setShowScheduleBrowser(false)}
+              style={styles.closeButton}
+            >
+              <Text style={styles.closeButtonText}>×</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {availableSchedules.length === 0 ? (
+            <View style={styles.noSchedulesContainer}>
+              <Calendar size={48} color="#999" />
+              <Text style={styles.noSchedulesText}>No previous schedules found</Text>
+              <Text style={styles.noSchedulesSubtext}>Create schedules on other dates to load them here</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.schedulesList}>
+              {availableSchedules.map((schedule: any) => {
+                const scheduleDate = new Date(schedule.date);
+                const dayName = dayNames[scheduleDate.getDay()];
+                const monthName = monthNames[scheduleDate.getMonth()];
+                const dateString = `${scheduleDate.getDate()} ${monthName} ${scheduleDate.getFullYear()}`;
+                
+                return (
+                  <TouchableOpacity
+                    key={schedule.id}
+                    style={styles.scheduleItem}
+                    onPress={() => handleLoadSchedule(schedule)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.scheduleInfo}>
+                      <Text style={styles.scheduleDay}>{dayName}</Text>
+                      <Text style={styles.scheduleDate}>{dateString}</Text>
+                      <Text style={styles.scheduleDetails}>
+                        {schedule.workingStaff?.length || 0} staff • {schedule.attendingParticipants?.length || 0} participants
+                      </Text>
+                    </View>
+                    <Download size={20} color="#4A90E2" />
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          )}
+        </View>
+      </View>
+    );
   };
 
   return (
@@ -452,6 +538,16 @@ export default function HomeScreen() {
             onEditPress={handleEditPress}
             onSharePress={handleSharePress}
           />
+          
+          {/* Load Schedule Button */}
+          <TouchableOpacity
+            style={styles.loadScheduleButton}
+            onPress={() => setShowScheduleBrowser(true)}
+            activeOpacity={0.7}
+          >
+            <Calendar size={18} color="#4A90E2" />
+            <Text style={styles.loadScheduleText}>Load Previous Schedule</Text>
+          </TouchableOpacity>
         </View>
         
         {lastUpdateTime && (
@@ -561,6 +657,9 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
+      
+      {/* Schedule Browser Modal */}
+      {renderScheduleBrowser()}
     </View>
   );
 }
@@ -726,5 +825,115 @@ const styles = StyleSheet.create({
   },
   rotatingIcon: {
     // Base style for rotating icon container
+  },
+  loadScheduleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0F8FF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#4A90E2',
+    gap: 6,
+  },
+  loadScheduleText: {
+    fontSize: 14,
+    color: '#4A90E2',
+    fontWeight: '600' as const,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '70%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold' as const,
+    color: '#333',
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 20,
+    color: '#666',
+    fontWeight: 'bold' as const,
+  },
+  noSchedulesContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  noSchedulesText: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  noSchedulesSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center' as const,
+  },
+  schedulesList: {
+    maxHeight: 400,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scheduleInfo: {
+    flex: 1,
+  },
+  scheduleDay: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    color: '#333',
+    marginBottom: 2,
+  },
+  scheduleDate: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  scheduleDetails: {
+    fontSize: 12,
+    color: '#999',
   },
 });
