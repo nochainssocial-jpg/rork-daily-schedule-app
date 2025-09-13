@@ -1,10 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, Share as RNShare } from 'react-native';
 import { Share, Users } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
-import * as Sharing from 'expo-sharing';
-import * as SMS from 'expo-sms';
 
 export default function ShareScreen() {
   const { selectedDate, getScheduleForDate, staff } = useSchedule();
@@ -19,32 +17,23 @@ export default function ShareScreen() {
 
     const scheduleText = generateScheduleText(schedule);
     
-    if (Platform.OS === 'web') {
-      if (navigator.share) {
+    try {
+      await RNShare.share({
+        message: scheduleText,
+        title: `Schedule for ${selectedDate}`,
+      });
+    } catch (error) {
+      console.log('Error sharing schedule:', error);
+      // Fallback to clipboard for web
+      if (Platform.OS === 'web' && navigator.clipboard) {
         try {
-          await navigator.share({
-            title: `Schedule for ${selectedDate}`,
-            text: scheduleText,
-          });
-        } catch (error) {
-          console.log('Error sharing:', error);
+          await navigator.clipboard.writeText(scheduleText);
+          Alert.alert('Copied', 'Schedule copied to clipboard');
+        } catch (clipboardError) {
+          console.log('Clipboard error:', clipboardError);
+          Alert.alert('Error', 'Unable to share or copy schedule');
         }
       } else {
-        // Fallback for web browsers without native sharing
-        navigator.clipboard.writeText(scheduleText);
-        Alert.alert('Copied', 'Schedule copied to clipboard');
-      }
-    } else {
-      // Mobile sharing
-      try {
-        const isAvailable = await SMS.isAvailableAsync();
-        if (isAvailable) {
-          await SMS.sendSMSAsync([], scheduleText);
-        } else {
-          await Sharing.shareAsync('data:text/plain;base64,' + btoa(scheduleText));
-        }
-      } catch (error) {
-        console.log('Error sharing:', error);
         Alert.alert('Error', 'Unable to share schedule');
       }
     }
@@ -81,54 +70,41 @@ export default function ShareScreen() {
   }
 
   const shareApp = async () => {
-    let appUrl = 'https://your-app-url.com'; // Default fallback URL
+    let appUrl = 'https://your-app-url.com';
     let shareText = '';
     
     if (Platform.OS === 'web') {
-      // Use window.location safely for web
       if (typeof window !== 'undefined' && window.location) {
-        appUrl = window.location.origin;
+        appUrl = window.location.href;
       }
       shareText = `Check out this Daily Schedule app! Access it here: ${appUrl}`;
+    } else {
+      shareText = 'Check out this Daily Schedule app! It helps organize staff schedules and participant attendance. Download it from your app store.';
+    }
+    
+    try {
+      const result = await RNShare.share({
+        message: shareText,
+        title: 'Daily Schedule App',
+        ...(Platform.OS === 'web' && { url: appUrl })
+      });
       
-      if (navigator.share) {
-        try {
-          await navigator.share({
-            title: 'Daily Schedule App',
-            text: shareText,
-            url: appUrl,
-          });
-        } catch (error) {
-          console.log('Error sharing app:', error);
-          Alert.alert('Error', 'Unable to share app link');
-        }
-      } else {
+      if (result.action === RNShare.sharedAction) {
+        console.log('App shared successfully');
+      }
+    } catch (error) {
+      console.log('Error sharing app:', error);
+      
+      // Fallback to clipboard for web
+      if (Platform.OS === 'web' && navigator.clipboard) {
         try {
           await navigator.clipboard.writeText(shareText);
           Alert.alert('Copied', 'App link copied to clipboard! Share it with your colleagues.');
-        } catch (error) {
-          console.log('Error copying to clipboard:', error);
-          Alert.alert('Error', 'Unable to copy app link');
+        } catch (clipboardError) {
+          console.log('Clipboard error:', clipboardError);
+          Alert.alert('Error', 'Unable to share or copy app link. Please copy this URL manually: ' + appUrl);
         }
-      }
-    } else {
-      // For mobile, share a general message about the app
-      shareText = 'Check out this Daily Schedule app! It helps organize staff schedules and participant attendance.';
-      
-      try {
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync('data:text/plain;base64,' + btoa(shareText));
-        } else {
-          // Fallback to SMS if sharing is not available
-          const isAvailable = await SMS.isAvailableAsync();
-          if (isAvailable) {
-            await SMS.sendSMSAsync([], shareText);
-          } else {
-            Alert.alert('Error', 'Sharing is not available on this device');
-          }
-        }
-      } catch (error) {
-        console.log('Error sharing app:', error);
+      } else {
         Alert.alert('Error', 'Unable to share app link');
       }
     }
