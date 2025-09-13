@@ -6,6 +6,7 @@ import type { Staff, Participant, Chore, TimeSlot } from '@/types/schedule';
 import { RefreshCw, AlertCircle, FileText } from 'lucide-react-native';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import { Document, Page, Text as PDFText, View as PDFView, StyleSheet as PDFStyleSheet, pdf } from '@react-pdf/renderer';
 
 export default function ViewPDFScreen() {
   const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion } = useSchedule();
@@ -213,19 +214,233 @@ export default function ViewPDFScreen() {
     return pdfText;
   }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, getGroupedDropOffs, getGroupedPickups]);
 
+  // PDF Document Component
+  const PDFDocument = useCallback(() => {
+    if (!schedule) return null;
+
+    const pdfStyles = PDFStyleSheet.create({
+      page: {
+        flexDirection: 'column',
+        backgroundColor: '#FFFFFF',
+        padding: 30,
+        fontSize: 10,
+        fontFamily: 'Helvetica',
+      },
+      header: {
+        fontSize: 16,
+        marginBottom: 20,
+        textAlign: 'center',
+        fontWeight: 'bold',
+        borderBottom: '2 solid #000000',
+        paddingBottom: 10,
+      },
+      sectionTitle: {
+        fontSize: 12,
+        fontWeight: 'bold',
+        marginTop: 15,
+        marginBottom: 8,
+        color: '#333333',
+      },
+      listItem: {
+        fontSize: 10,
+        marginBottom: 3,
+        marginLeft: 10,
+      },
+      assignmentContainer: {
+        marginBottom: 8,
+      },
+      staffName: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#0066CC',
+      },
+      participantName: {
+        fontSize: 9,
+        marginLeft: 15,
+        marginBottom: 2,
+      },
+      timeSlotContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 3,
+      },
+      timeSlot: {
+        fontSize: 10,
+        width: '40%',
+      },
+      assignedStaff: {
+        fontSize: 10,
+        width: '60%',
+        color: '#0066CC',
+      },
+      choreContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 3,
+      },
+      choreName: {
+        fontSize: 10,
+        width: '60%',
+      },
+      footer: {
+        position: 'absolute',
+        bottom: 30,
+        left: 30,
+        right: 30,
+        textAlign: 'center',
+        fontSize: 8,
+        color: '#666666',
+        borderTop: '1 solid #CCCCCC',
+        paddingTop: 10,
+      },
+    });
+
+    const formatDate = () => {
+      const [year, month, day] = selectedDate.split('-');
+      return `${day}/${month}/${year}`;
+    };
+
+    return (
+      <Document>
+        <Page size="A4" style={pdfStyles.page}>
+          <PDFText style={pdfStyles.header}>
+            DAILY SCHEDULE - {formatDate()}
+          </PDFText>
+
+          {/* Staff Working Today */}
+          <PDFText style={pdfStyles.sectionTitle}>1. STAFF WORKING TODAY</PDFText>
+          {schedule.workingStaff && schedule.workingStaff.length > 0 ? (
+            schedule.workingStaff.map((staffId, index) => (
+              <PDFText key={index} style={pdfStyles.listItem}>• {getStaffName(staffId)}</PDFText>
+            ))
+          ) : (
+            <PDFText style={pdfStyles.listItem}>No staff assigned</PDFText>
+          )}
+
+          {/* Participants Attending Today */}
+          <PDFText style={pdfStyles.sectionTitle}>2. PARTICIPANTS ATTENDING TODAY</PDFText>
+          {schedule.attendingParticipants && schedule.attendingParticipants.length > 0 ? (
+            schedule.attendingParticipants.map((participantId, index) => (
+              <PDFText key={index} style={pdfStyles.listItem}>• {getParticipantName(participantId)}</PDFText>
+            ))
+          ) : (
+            <PDFText style={pdfStyles.listItem}>No participants assigned</PDFText>
+          )}
+
+          {/* Daily Assignment */}
+          <PDFText style={pdfStyles.sectionTitle}>3. DAILY ASSIGNMENT</PDFText>
+          {schedule.assignments.map((assignment, index) => (
+            <PDFView key={index} style={pdfStyles.assignmentContainer}>
+              <PDFText style={pdfStyles.staffName}>{getStaffName(assignment.staffId)}:</PDFText>
+              {assignment.participantIds.map(participantId => (
+                <PDFText key={participantId} style={pdfStyles.participantName}>
+                  • {getParticipantName(participantId)}
+                </PDFText>
+              ))}
+            </PDFView>
+          ))}
+
+          {/* Front Room - Not shown on Saturdays */}
+          {!isSaturday() && (
+            <>
+              <PDFText style={pdfStyles.sectionTitle}>4. FRONT ROOM</PDFText>
+              {schedule.frontRoomSlots.map((slot, index) => (
+                <PDFView key={index} style={pdfStyles.timeSlotContainer}>
+                  <PDFText style={pdfStyles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</PDFText>
+                  <PDFText style={pdfStyles.assignedStaff}>{getStaffName(slot.staffId)}</PDFText>
+                </PDFView>
+              ))}
+
+              <PDFText style={pdfStyles.sectionTitle}>5. SCOTTY</PDFText>
+              {schedule.scottySlots.map((slot, index) => (
+                <PDFView key={index} style={pdfStyles.timeSlotContainer}>
+                  <PDFText style={pdfStyles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</PDFText>
+                  <PDFText style={pdfStyles.assignedStaff}>{getStaffName(slot.staffId)}</PDFText>
+                </PDFView>
+              ))}
+
+              <PDFText style={pdfStyles.sectionTitle}>6. TWINS</PDFText>
+              {schedule.twinsSlots.map((slot, index) => (
+                <PDFView key={index} style={pdfStyles.timeSlotContainer}>
+                  <PDFText style={pdfStyles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</PDFText>
+                  <PDFText style={pdfStyles.assignedStaff}>{getStaffName(slot.staffId)}</PDFText>
+                </PDFView>
+              ))}
+            </>
+          )}
+
+          {/* Chores */}
+          <PDFText style={pdfStyles.sectionTitle}>{isSaturday() ? '4' : '7'}. CHORES</PDFText>
+          {schedule.choreAssignments.map((assignment, index) => (
+            <PDFView key={index} style={pdfStyles.choreContainer}>
+              <PDFText style={pdfStyles.choreName}>{getChoreName(assignment.choreId)}</PDFText>
+              <PDFText style={pdfStyles.assignedStaff}>{getStaffName(assignment.staffId)}</PDFText>
+            </PDFView>
+          ))}
+
+          {/* Drop-offs */}
+          <PDFText style={pdfStyles.sectionTitle}>{isSaturday() ? '5' : '8'}. DROP-OFFS</PDFText>
+          {getGroupedDropOffs().length > 0 ? (
+            getGroupedDropOffs().map((group, index) => (
+              <PDFView key={`dropoff-${group.staffId}`} style={pdfStyles.assignmentContainer}>
+                <PDFText style={pdfStyles.staffName}>{getStaffName(group.staffId)}:</PDFText>
+                <PDFText style={pdfStyles.participantName}>
+                  {group.dropOffs.map(d => getParticipantName(d.participantId)).join(', ')}
+                </PDFText>
+              </PDFView>
+            ))
+          ) : (
+            <PDFText style={pdfStyles.listItem}>No drop-offs scheduled</PDFText>
+          )}
+
+          {/* Pickups */}
+          <PDFText style={pdfStyles.sectionTitle}>{isSaturday() ? '6' : '9'}. PICKUPS</PDFText>
+          {getGroupedPickups().length > 0 ? (
+            getGroupedPickups().map((group, index) => (
+              <PDFView key={`pickup-${group.staffId}`} style={pdfStyles.assignmentContainer}>
+                <PDFText style={pdfStyles.staffName}>{getStaffName(group.staffId)}:</PDFText>
+                <PDFText style={pdfStyles.participantName}>
+                  {group.pickups.map(p => getParticipantName(p.participantId)).join(', ')}
+                </PDFText>
+              </PDFView>
+            ))
+          ) : (
+            <PDFText style={pdfStyles.listItem}>No pickups scheduled</PDFText>
+          )}
+
+          {/* Final Checklist */}
+          <PDFText style={pdfStyles.sectionTitle}>{isSaturday() ? '7' : '10'}. FINAL CHECKLIST</PDFText>
+          <PDFText style={pdfStyles.listItem}>
+            Assigned to: {getStaffName(schedule.finalChecklistStaff)}
+          </PDFText>
+
+          <PDFText style={pdfStyles.footer}>
+            Generated on: {new Date().toLocaleString()} | App Version: {appVersion}
+          </PDFText>
+        </Page>
+      </Document>
+    );
+  }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, getGroupedDropOffs, getGroupedPickups]);
+
   const sharePDF = useCallback(async () => {
     if (!schedule) {
       Alert.alert('No Schedule', 'No schedule available to share');
       return;
     }
 
-    const pdfText = generatePDFText();
-    const fileName = `Daily_Schedule_${selectedDate.replace(/-/g, '_')}.txt`;
+    const fileName = `Daily_Schedule_${selectedDate.replace(/-/g, '_')}.pdf`;
     
     try {
+      // Generate PDF blob
+      const pdfDoc = PDFDocument();
+      if (!pdfDoc) {
+        Alert.alert('Error', 'Unable to generate PDF document.');
+        return;
+      }
+      const blob = await pdf(pdfDoc).toBlob();
+      
       if (Platform.OS === 'web') {
-        // Create a blob and download it as a file on web
-        const blob = new Blob([pdfText], { type: 'text/plain' });
+        // Create a download link for web
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -236,36 +451,46 @@ export default function ViewPDFScreen() {
         URL.revokeObjectURL(url);
         Alert.alert('Success', 'PDF file downloaded successfully!');
       } else {
-        // For mobile, create a file and share it as an attachment
-        const fileUri = FileSystem.documentDirectory + fileName;
-        
-        // Write the text content to a file
-        await FileSystem.writeAsStringAsync(fileUri, pdfText, {
-          encoding: FileSystem.EncodingType.UTF8,
-        });
-        
-        // Check if sharing is available
-        const isAvailable = await Sharing.isAvailableAsync();
-        
-        if (isAvailable) {
-          // Share the file as an attachment
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'text/plain',
-            dialogTitle: `Daily Schedule - ${(() => {
-              const [year, month, day] = selectedDate.split('-');
-              return `${day}/${month}/${year}`;
-            })()}`,
-            UTI: 'public.plain-text', // For iOS
-          });
-        } else {
-          Alert.alert('Sharing not available', 'File sharing is not available on this device.');
-        }
+        // For mobile, convert blob to base64 and save as file
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const base64Data = (reader.result as string).split(',')[1];
+            const fileUri = FileSystem.documentDirectory + fileName;
+            
+            // Write the PDF content to a file
+            await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+            
+            // Check if sharing is available
+            const isAvailable = await Sharing.isAvailableAsync();
+            
+            if (isAvailable) {
+              // Share the PDF file as an attachment
+              await Sharing.shareAsync(fileUri, {
+                mimeType: 'application/pdf',
+                dialogTitle: `Daily Schedule - ${(() => {
+                  const [year, month, day] = selectedDate.split('-');
+                  return `${day}/${month}/${year}`;
+                })()}`,
+                UTI: 'com.adobe.pdf', // For iOS
+              });
+            } else {
+              Alert.alert('Sharing not available', 'File sharing is not available on this device.');
+            }
+          } catch (error) {
+            console.log('Error saving/sharing PDF:', error);
+            Alert.alert('Error', 'Unable to share PDF. Please try again.');
+          }
+        };
+        reader.readAsDataURL(blob);
       }
     } catch (error) {
-      console.log('Error sharing PDF:', error);
-      Alert.alert('Error', 'Unable to share PDF. Please try again.');
+      console.log('Error generating PDF:', error);
+      Alert.alert('Error', 'Unable to generate PDF. Please try again.');
     }
-  }, [schedule, generatePDFText, selectedDate]);
+  }, [schedule, selectedDate, PDFDocument]);
 
   // Auto-refresh when critical updates are detected
   useEffect(() => {
