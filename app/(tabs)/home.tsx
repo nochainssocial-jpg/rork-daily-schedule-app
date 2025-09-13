@@ -84,44 +84,19 @@ export default function HomeScreen() {
 
   const todaySchedule = getScheduleForDate(selectedDate);
   
-  // Enhanced debug logging with automatic data loading
+  // Debug logging - only in development
   useEffect(() => {
-    console.log('=== HOME SCREEN DEBUG ===');
-    console.log('Selected date:', selectedDate);
-    console.log('Today schedule:', todaySchedule ? 'Found' : 'Not found');
-    console.log('Total schedules:', schedules.length);
-
-    
-    if (todaySchedule) {
-      console.log('Schedule details:', {
-        id: todaySchedule.id,
-        date: todaySchedule.date,
-        workingStaff: todaySchedule.workingStaff.length,
-        participants: todaySchedule.attendingParticipants.length
-      });
-    } else {
-      console.log('No schedule found for today. Checking if data needs to be loaded...');
-      
-      // If no schedule is found but we have schedules in general, log available dates
-      if (schedules.length > 0) {
-        console.log('Available schedule dates:', schedules.map((s: any) => ({ date: s.date, id: s.id })));
-        console.log('Date mismatch - looking for:', selectedDate);
-      } else {
-        console.log('No schedules available in state - may need to refresh data');
-      }
+    if (__DEV__) {
+      console.log('Home screen - Date:', selectedDate, 'Schedule:', todaySchedule ? 'Found' : 'Not found', 'Total:', schedules.length);
     }
-    
-    console.log('========================');
-  }, [selectedDate, todaySchedule, schedules]);
+  }, [selectedDate, todaySchedule, schedules.length]);
   
-  // Auto-refresh data when component mounts or date changes
+  // Auto-refresh data when component mounts or date changes - optimized
   useEffect(() => {
     const autoRefreshData = async () => {
       // Only auto-refresh if we don't have a schedule for the current date
       if (!todaySchedule && schedules.length === 0) {
-        console.log('Auto-refreshing data on mount/date change...');
         await refreshAllData();
-
       }
     };
     
@@ -129,7 +104,7 @@ export default function HomeScreen() {
     const timeoutId = setTimeout(autoRefreshData, 100);
     
     return () => clearTimeout(timeoutId);
-  }, [selectedDate, todaySchedule, schedules.length, refreshAllData]); // Include all dependencies
+  }, [selectedDate]); // Reduced dependencies to prevent excessive re-runs
   
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -160,8 +135,6 @@ export default function HomeScreen() {
   
   // Load the most recently created schedule
   const loadLastSchedule = async () => {
-    console.log('Loading last created schedule...');
-    
     if (schedules.length === 0) {
       Alert.alert('No Schedules', 'No schedules found to load.');
       return;
@@ -195,8 +168,6 @@ export default function HomeScreen() {
         'Schedule Loaded', 
         `Successfully loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today.`
       );
-      
-      // Force update removed - no longer needed
     } catch (error) {
       console.error('Error loading last schedule:', error);
       Alert.alert('Error', 'Failed to load the last schedule. Please try again.');

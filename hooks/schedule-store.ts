@@ -83,12 +83,11 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     setHasNewUpdates(false);
   }, []);
 
-  // Update selected date when day changes
+  // Update selected date when day changes - optimized to prevent excessive re-renders
   useEffect(() => {
     const checkDateChange = () => {
       try {
         const now = new Date();
-        // Use a more robust date formatting approach
         const year = now.getFullYear();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const day = String(now.getDate()).padStart(2, '0');
@@ -102,14 +101,11 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       }
     };
 
-    // Check immediately
-    checkDateChange();
-
-    // Check every minute
-    const interval = setInterval(checkDateChange, 60000);
+    // Only check every 5 minutes to reduce performance impact
+    const interval = setInterval(checkDateChange, 300000);
 
     return () => clearInterval(interval);
-  }, [selectedDate]);
+  }, []);  // Remove selectedDate from dependencies to prevent infinite loop
 
   // Load staff data
   const staffQuery = useQuery({
@@ -273,9 +269,6 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       // If new staff were added, make them available for selection in existing schedules
       if (data.newStaffIds.length > 0) {
-        // Note: We don't automatically add them to working staff as that should be user's choice
-        // But they will be available for selection in future schedule creation
-        console.log(`Added ${data.newStaffIds.length} new staff members`);
         await trackCriticalUpdate('staff_added');
       }
     }
@@ -316,13 +309,6 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
 
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: Schedule) => {
-      console.log('Saving schedule to AsyncStorage:', {
-        id: schedule.id,
-        date: schedule.date,
-        workingStaff: schedule.workingStaff.length,
-        participants: schedule.attendingParticipants.length
-      });
-      
       const schedules = schedulesQuery.data || [];
       const existingIndex = schedules.findIndex((s: Schedule) => s.date === schedule.date);
       
@@ -330,10 +316,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       if (existingIndex >= 0) {
         schedules[existingIndex] = schedule;
-        console.log('Updated existing schedule at index:', existingIndex);
       } else {
         schedules.push(schedule);
-        console.log('Added new schedule, total schedules:', schedules.length);
       }
       
       // Save to AsyncStorage with error handling
@@ -346,25 +330,6 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         }
         
         await AsyncStorage.setItem('schedules', schedulesJson);
-        console.log('Successfully saved schedules to AsyncStorage');
-        
-        // Verify the save by reading it back
-        const savedData = await AsyncStorage.getItem('schedules');
-        if (savedData) {
-          try {
-            const trimmed = savedData.trim();
-            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
-              const parsedData = JSON.parse(trimmed);
-              console.log('Verified saved schedules count:', parsedData.length);
-              const savedSchedule = parsedData.find((s: any) => s.date === schedule.date);
-              console.log('Verified schedule for date exists:', savedSchedule ? 'YES' : 'NO');
-            } else {
-              console.log('Invalid saved data format during verification');
-            }
-          } catch (parseError) {
-            console.error('Error parsing saved data during verification:', parseError);
-          }
-        }
       } catch (error) {
         console.error('Error saving schedule to AsyncStorage:', error);
         throw error;
@@ -399,7 +364,6 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         
         await AsyncStorage.setItem(`categoryUpdates_${schedule.date}`, JSON.stringify(filteredUpdates));
         setCategoryUpdates(filteredUpdates);
-        console.log('Updated category updates for date:', schedule.date);
       } catch (error) {
         console.error('Error saving category updates:', error);
       }
@@ -407,11 +371,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       return schedules;
     },
     onSuccess: async (schedules) => {
-      console.log('Schedule save mutation successful, invalidating queries...');
       await queryClient.invalidateQueries({ queryKey: ['schedules'] });
-      await queryClient.refetchQueries({ queryKey: ['schedules'] });
       await trackCriticalUpdate('schedule_saved');
-      console.log('Queries invalidated and refetched');
     },
     onError: (error) => {
       console.error('Schedule save mutation failed:', error);

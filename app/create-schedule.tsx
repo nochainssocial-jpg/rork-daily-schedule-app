@@ -15,10 +15,15 @@ export default function CreateScheduleScreen() {
     selectedDate 
   } = useSchedule();
   
-  // Ensure we start at step 1 when component mounts
+  // Initialize step only once when component mounts
+  const [isInitialized, setIsInitialized] = useState(false);
+  
   useEffect(() => {
-    setScheduleStep(1);
-  }, [setScheduleStep]);
+    if (!isInitialized) {
+      setScheduleStep(1);
+      setIsInitialized(true);
+    }
+  }, [isInitialized, setScheduleStep]);
   
   // Check if selected date is Saturday
   const isSaturday = () => {
@@ -50,15 +55,15 @@ export default function CreateScheduleScreen() {
     );
   };
 
-  const handleBackStep = () => {
+  const handleBackStep = useCallback(() => {
     if (scheduleStep > 1) {
       setScheduleStep(scheduleStep - 1);
     } else {
       router.back();
     }
-  };
+  }, [scheduleStep, setScheduleStep]);
 
-  const handleCancel = () => {
+  const handleCancel = useCallback(() => {
     Alert.alert(
       'Cancel Schedule Creation',
       'Are you sure you want to cancel? All progress will be lost.',
@@ -71,19 +76,20 @@ export default function CreateScheduleScreen() {
           text: 'Cancel',
           style: 'destructive',
           onPress: () => {
-            // Reset schedule step and go back to home
             setScheduleStep(1);
             router.replace('/(tabs)/home');
           }
         }
       ]
     );
-  };
+  }, [setScheduleStep]);
 
 
 
   // Stable calculation of whether we can proceed to next step
   const canProceedToNextStep = useMemo(() => {
+    if (!isInitialized) return false;
+    
     switch (scheduleStep) {
       case 1:
         return workingStaff.length > 0;
@@ -100,10 +106,10 @@ export default function CreateScheduleScreen() {
       default:
         return false;
     }
-  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff]);
+  }, [isInitialized, scheduleStep, workingStaff.length, attendingParticipants.length, assignments, finalChecklistStaff]);
 
   const handleNextStep = useCallback(() => {
-    console.log('handleNextStep called, current step:', scheduleStep);
+    if (!canProceedToNextStep) return;
     
     switch (scheduleStep) {
       case 1:
@@ -111,7 +117,6 @@ export default function CreateScheduleScreen() {
           Alert.alert('Selection Required', 'Please select at least one staff member.');
           return;
         }
-        console.log('Moving from step 1 to step 2');
         setScheduleStep(2);
         break;
       case 2:
@@ -125,7 +130,6 @@ export default function CreateScheduleScreen() {
           participantIds: []
         }));
         setAssignments(initialAssignments);
-        console.log('Moving from step 2 to step 3');
         setScheduleStep(3);
         break;
       case 3:
@@ -137,11 +141,9 @@ export default function CreateScheduleScreen() {
           Alert.alert('Assignment Incomplete', 'Please assign all participants to staff members.');
           return;
         }
-        console.log('Moving from step 3 to step 4');
         setScheduleStep(4);
         break;
       case 4:
-        console.log('Moving from step 4 to step 5');
         setScheduleStep(5);
         break;
       case 5:
@@ -149,7 +151,6 @@ export default function CreateScheduleScreen() {
           Alert.alert('Selection Required', 'Please select a staff member for the final checklist.');
           return;
         }
-        console.log('Creating schedule and navigating to view-pdf');
         // Create the schedule
         createSchedule(workingStaff, attendingParticipants, assignments, finalChecklistStaff);
         Alert.alert(
@@ -159,18 +160,14 @@ export default function CreateScheduleScreen() {
             {
               text: 'Review',
               onPress: () => {
-                console.log('Navigating to view-pdf');
                 router.replace('/(tabs)/view-pdf');
               }
             }
           ]
         );
         break;
-      default:
-        console.log('Unknown step:', scheduleStep);
-        break;
     }
-  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff, createSchedule, setScheduleStep]);
+  }, [canProceedToNextStep, scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff, createSchedule, setScheduleStep]);
 
   const assignParticipantToStaff = (staffId: string, participantId: string) => {
     setAssignments(prev => prev.map(assignment => {
@@ -485,25 +482,17 @@ export default function CreateScheduleScreen() {
         </ScrollView>
         
         <View style={styles.nextButtonContainer}>
-          {canProceedToNextStep ? (
-            <TouchableOpacity 
-              style={styles.nextButton} 
-              onPress={handleNextStep}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.nextButtonText}>
-                {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
-              </Text>
-              <ChevronRight size={20} color="white" />
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.nextButton, styles.nextButtonDisabled]}>
-              <Text style={[styles.nextButtonText, styles.nextButtonTextDisabled]}>
-                {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
-              </Text>
-              <ChevronRight size={20} color="#999" />
-            </View>
-          )}
+          <TouchableOpacity 
+            style={[styles.nextButton, !canProceedToNextStep && styles.nextButtonDisabled]} 
+            onPress={canProceedToNextStep ? handleNextStep : undefined}
+            activeOpacity={canProceedToNextStep ? 0.7 : 1}
+            disabled={!canProceedToNextStep}
+          >
+            <Text style={[styles.nextButtonText, !canProceedToNextStep && styles.nextButtonTextDisabled]}>
+              {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
+            </Text>
+            <ChevronRight size={20} color={canProceedToNextStep ? "white" : "#999"} />
+          </TouchableOpacity>
         </View>
       </View>
     </>
