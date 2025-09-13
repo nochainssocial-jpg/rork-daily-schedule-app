@@ -213,31 +213,39 @@ export default function ViewPDFScreen() {
 
   const sharePDF = useCallback(async () => {
     if (!schedule) {
-      console.log('No schedule available to share');
+      Alert.alert('No Schedule', 'No schedule available to share');
       return;
     }
 
     const pdfText = generatePDFText();
+    const fileName = `Daily_Schedule_${selectedDate.replace(/-/g, '_')}.txt`;
     
     try {
-      await RNShare.share({
-        message: pdfText,
-        title: `Daily Schedule - ${(() => {
-          const [year, month, day] = selectedDate.split('-');
-          return `${day}/${month}/${year}`;
-        })()}`
-      });
+      if (Platform.OS === 'web') {
+        // Create a blob and download it as a file on web
+        const blob = new Blob([pdfText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        Alert.alert('Success', 'PDF file downloaded successfully!');
+      } else {
+        // For mobile, share as text file attachment
+        await RNShare.share({
+          message: pdfText,
+          title: `Daily Schedule - ${(() => {
+            const [year, month, day] = selectedDate.split('-');
+            return `${day}/${month}/${year}`;
+          })()}`,
+        });
+      }
     } catch (error) {
       console.log('Error sharing PDF:', error);
-      // Fallback to clipboard for web
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(pdfText);
-          console.log('Schedule PDF content copied to clipboard');
-        } catch (clipboardError) {
-          console.log('Clipboard error:', clipboardError);
-        }
-      }
+      Alert.alert('Error', 'Unable to share PDF. Please try again.');
     }
   }, [schedule, generatePDFText, selectedDate]);
 

@@ -14,53 +14,7 @@ export default function ShareScreen() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isImporting, setIsImporting] = useState<boolean>(false);
 
-  const shareSchedule = async () => {
-    if (!schedule) {
-      Alert.alert('No Schedule', 'No schedule found for the selected date.');
-      return;
-    }
 
-    const scheduleText = generateScheduleText(schedule);
-    
-    try {
-      await RNShare.share({
-        message: scheduleText,
-        title: `Schedule for ${selectedDate}`,
-      });
-    } catch (error) {
-      console.log('Error sharing schedule:', error);
-      // Fallback to clipboard for web
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(scheduleText);
-          Alert.alert('Copied', 'Schedule copied to clipboard');
-        } catch (clipboardError) {
-          console.log('Clipboard error:', clipboardError);
-          Alert.alert('Error', 'Unable to share or copy schedule');
-        }
-      } else {
-        Alert.alert('Error', 'Unable to share schedule');
-      }
-    }
-  };
-
-  const generateScheduleText = (schedule: any) => {
-    const staffMap = staff.reduce((acc: any, s: any) => {
-      acc[s.id] = s.name;
-      return acc;
-    }, {});
-
-    let text = `Daily Schedule - ${selectedDate}\n\n`;
-    
-    text += `Working Staff:\n${schedule.workingStaff.map((id: string) => `• ${staffMap[id]}`).join('\n')}\n\n`;
-    
-    text += `Attending Participants:\n${schedule.attendingParticipants.map((id: string) => {
-      // Find participant name logic here
-      return `• Participant ${id}`;
-    }).join('\n')}\n\n`;
-
-    return text;
-  };
 
 
 
@@ -328,23 +282,7 @@ export default function ShareScreen() {
         <Text style={styles.helpText}>Share this link so colleagues can access the app instantly</Text>
       </View>
 
-      {schedule && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Share Today&apos;s Schedule (Text)</Text>
-          <Text style={styles.date}>{selectedDate}</Text>
-          <TouchableOpacity style={styles.shareButton} onPress={shareSchedule}>
-            <Share size={24} color="white" />
-            <Text style={styles.shareButtonText}>Share as Text</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
-      {schedule && (
-        <View style={styles.preview}>
-          <Text style={styles.previewTitle}>Schedule Preview</Text>
-          <Text style={styles.previewText}>{generateScheduleText(schedule)}</Text>
-        </View>
-      )}
     </ScrollView>
   );
 }
