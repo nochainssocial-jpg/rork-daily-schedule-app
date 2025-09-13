@@ -16,12 +16,6 @@ export default function ShareScreen() {
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const [isImporting, setIsImporting] = useState<boolean>(false);
 
-
-
-
-
-
-
   const generateCode = async () => {
     if (!schedule) {
       Alert.alert('No Schedule', 'No schedule found for the selected date.');
@@ -162,90 +156,85 @@ export default function ShareScreen() {
       </View>
 
       <ScrollView style={styles.scrollView}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
+          <Text style={styles.date}>{selectedDate}</Text>
+          
+          {schedule ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.codeButton, styles.generateButton]} 
+                onPress={generateCode}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Hash size={24} color="white" />
+                )}
+                <Text style={styles.shareButtonText}>
+                  {isGenerating ? 'Generating...' : 'Generate Code'}
+                </Text>
+              </TouchableOpacity>
+              
+              {generatedCode && (
+                <View style={styles.codeDisplay}>
+                  <Text style={styles.codeLabel}>Your sharing code:</Text>
+                  <View style={styles.codeContainer}>
+                    <Text style={styles.codeText}>{generatedCode}</Text>
+                    <TouchableOpacity 
+                      style={styles.copyButton}
+                      onPress={() => copyCodeToClipboard(generatedCode)}
+                    >
+                      <Copy size={16} color="#2196F3" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.codeExpiry}>Expires in 24 hours</Text>
+                </View>
+              )}
+              
+              <Text style={styles.helpText}>Generate a 6-digit code to share this schedule with colleagues</Text>
+            </>
+          ) : (
+            <View style={styles.noScheduleContainer}>
+              <Hash size={32} color="#CCC" />
+              <Text style={styles.noScheduleText}>No schedule available for {selectedDate}</Text>
+              <Text style={styles.helpText}>Create a schedule first or import one using a code below</Text>
+            </View>
+          )}
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
-        <Text style={styles.date}>{selectedDate}</Text>
-        
-        {schedule ? (
-          <>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Import Schedule</Text>
+          <Text style={styles.inputLabel}>Enter 6-digit code:</Text>
+          <View style={styles.importContainer}>
+            <TextInput
+              style={styles.codeInput}
+              value={importCode}
+              onChangeText={setImportCode}
+              placeholder="123456"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+              maxLength={6}
+              testID="import-code-input"
+            />
             <TouchableOpacity 
-              style={[styles.codeButton, styles.generateButton]} 
-              onPress={generateCode}
-              disabled={isGenerating}
+              style={[styles.codeButton, styles.importButton]} 
+              onPress={importSchedule}
+              disabled={isImporting || importCode.length !== 6}
             >
-              {isGenerating ? (
+              {isImporting ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Hash size={24} color="white" />
+                <Download size={20} color="white" />
               )}
-              <Text style={styles.shareButtonText}>
-                {isGenerating ? 'Generating...' : 'Generate Code'}
+              <Text style={styles.importButtonText}>
+                {isImporting ? 'Importing...' : 'Import'}
               </Text>
             </TouchableOpacity>
-            
-            {generatedCode && (
-              <View style={styles.codeDisplay}>
-                <Text style={styles.codeLabel}>Your sharing code:</Text>
-                <View style={styles.codeContainer}>
-                  <Text style={styles.codeText}>{generatedCode}</Text>
-                  <TouchableOpacity 
-                    style={styles.copyButton}
-                    onPress={() => copyCodeToClipboard(generatedCode)}
-                  >
-                    <Copy size={16} color="#2196F3" />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.codeExpiry}>Expires in 24 hours</Text>
-              </View>
-            )}
-            
-            <Text style={styles.helpText}>Generate a 6-digit code to share this schedule with colleagues</Text>
-          </>
-        ) : (
-          <View style={styles.noScheduleContainer}>
-            <Hash size={32} color="#CCC" />
-            <Text style={styles.noScheduleText}>No schedule available for {selectedDate}</Text>
-            <Text style={styles.helpText}>Create a schedule first or import one using a code below</Text>
           </View>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Import Schedule</Text>
-        <Text style={styles.inputLabel}>Enter 6-digit code:</Text>
-        <View style={styles.importContainer}>
-          <TextInput
-            style={styles.codeInput}
-            value={importCode}
-            onChangeText={setImportCode}
-            placeholder="123456"
-            placeholderTextColor="#999"
-            keyboardType="numeric"
-            maxLength={6}
-            testID="import-code-input"
-          />
-          <TouchableOpacity 
-            style={[styles.codeButton, styles.importButton]} 
-            onPress={importSchedule}
-            disabled={isImporting || importCode.length !== 6}
-          >
-            {isImporting ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Download size={20} color="white" />
-            )}
-            <Text style={styles.importButtonText}>
-              {isImporting ? 'Importing...' : 'Import'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.helpText}>Import a schedule shared by a colleague using their 6-digit code</Text>
         </View>
-        <Text style={styles.helpText}>Import a schedule shared by a colleague using their 6-digit code</Text>
-      </View>
-
-
-
-
       </ScrollView>
     </View>
   );
