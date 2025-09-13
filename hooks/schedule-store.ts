@@ -43,17 +43,34 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   // Check for app updates and load category updates
   useEffect(() => {
     const checkAppVersion = async () => {
-      const storedVersion = await AsyncStorage.getItem('lastViewedVersion');
-      setLastViewedVersion(storedVersion || '');
-      
-      if (storedVersion !== APP_VERSION) {
-        setHasNewUpdates(true);
-      }
-      
-      // Load category updates for current date
-      const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
-      if (updates) {
-        setCategoryUpdates(JSON.parse(updates));
+      try {
+        const storedVersion = await AsyncStorage.getItem('lastViewedVersion');
+        setLastViewedVersion(storedVersion || '');
+        
+        if (storedVersion !== APP_VERSION) {
+          setHasNewUpdates(true);
+        }
+        
+        // Load category updates for current date
+        const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
+        if (updates) {
+          try {
+            const trimmed = updates.trim();
+            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+              setCategoryUpdates(JSON.parse(trimmed));
+            } else {
+              setCategoryUpdates([]);
+            }
+          } catch (parseError) {
+            console.error('Error parsing category updates:', parseError);
+            setCategoryUpdates([]);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking app version:', error);
+        setLastViewedVersion('');
+        setHasNewUpdates(false);
+        setCategoryUpdates([]);
       }
     };
     checkAppVersion();
@@ -98,8 +115,22 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const staffQuery = useQuery({
     queryKey: ['staff'],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem('staff');
-      return stored ? JSON.parse(stored) : DEFAULT_STAFF;
+      try {
+        const stored = await AsyncStorage.getItem('staff');
+        if (!stored) return DEFAULT_STAFF;
+        
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+          console.warn('Invalid staff data format, using defaults');
+          return DEFAULT_STAFF;
+        }
+        
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.error('Error parsing staff data:', error);
+        return DEFAULT_STAFF;
+      }
     }
   });
 
@@ -107,8 +138,22 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const participantsQuery = useQuery({
     queryKey: ['participants'],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem('participants');
-      return stored ? JSON.parse(stored) : DEFAULT_PARTICIPANTS;
+      try {
+        const stored = await AsyncStorage.getItem('participants');
+        if (!stored) return DEFAULT_PARTICIPANTS;
+        
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+          console.warn('Invalid participants data format, using defaults');
+          return DEFAULT_PARTICIPANTS;
+        }
+        
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.error('Error parsing participants data:', error);
+        return DEFAULT_PARTICIPANTS;
+      }
     }
   });
 
@@ -116,8 +161,22 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const choresQuery = useQuery({
     queryKey: ['chores'],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem('chores');
-      return stored ? JSON.parse(stored) : DEFAULT_CHORES;
+      try {
+        const stored = await AsyncStorage.getItem('chores');
+        if (!stored) return DEFAULT_CHORES;
+        
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+          console.warn('Invalid chores data format, using defaults');
+          return DEFAULT_CHORES;
+        }
+        
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.error('Error parsing chores data:', error);
+        return DEFAULT_CHORES;
+      }
     }
   });
 
@@ -125,8 +184,22 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const checklistQuery = useQuery({
     queryKey: ['checklist'],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem('checklist');
-      return stored ? JSON.parse(stored) : DEFAULT_CHECKLIST;
+      try {
+        const stored = await AsyncStorage.getItem('checklist');
+        if (!stored) return DEFAULT_CHECKLIST;
+        
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+          console.warn('Invalid checklist data format, using defaults');
+          return DEFAULT_CHECKLIST;
+        }
+        
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.error('Error parsing checklist data:', error);
+        return DEFAULT_CHECKLIST;
+      }
     }
   });
 
@@ -134,22 +207,52 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const schedulesQuery = useQuery({
     queryKey: ['schedules'],
     queryFn: async () => {
-      const stored = await AsyncStorage.getItem('schedules');
-      return stored ? JSON.parse(stored) : [];
+      try {
+        const stored = await AsyncStorage.getItem('schedules');
+        if (!stored) return [];
+        
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
+          console.warn('Invalid schedules data format, using empty array');
+          return [];
+        }
+        
+        return JSON.parse(trimmed);
+      } catch (error) {
+        console.error('Error parsing schedules data:', error);
+        return [];
+      }
     }
   });
 
   // Track critical updates
   const trackCriticalUpdate = async (updateType: string) => {
-    const updates = await AsyncStorage.getItem('criticalUpdates') || '[]';
-    const parsedUpdates = JSON.parse(updates);
-    parsedUpdates.push({
-      type: updateType,
-      timestamp: new Date().toISOString(),
-      version: APP_VERSION
-    });
-    await AsyncStorage.setItem('criticalUpdates', JSON.stringify(parsedUpdates));
-    setHasNewUpdates(true);
+    try {
+      const updates = await AsyncStorage.getItem('criticalUpdates') || '[]';
+      let parsedUpdates = [];
+      
+      try {
+        const trimmed = updates.trim();
+        if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+          parsedUpdates = JSON.parse(trimmed);
+        }
+      } catch (parseError) {
+        console.error('Error parsing critical updates, starting fresh:', parseError);
+        parsedUpdates = [];
+      }
+      
+      parsedUpdates.push({
+        type: updateType,
+        timestamp: new Date().toISOString(),
+        version: APP_VERSION
+      });
+      
+      await AsyncStorage.setItem('criticalUpdates', JSON.stringify(parsedUpdates));
+      setHasNewUpdates(true);
+    } catch (error) {
+      console.error('Error tracking critical update:', error);
+    }
   };
 
   // Save mutations
@@ -235,16 +338,32 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       // Save to AsyncStorage with error handling
       try {
-        await AsyncStorage.setItem('schedules', JSON.stringify(schedules));
+        const schedulesJson = JSON.stringify(schedules);
+        
+        // Validate the JSON before saving
+        if (!schedulesJson || schedulesJson === 'undefined' || schedulesJson === 'null') {
+          throw new Error('Invalid schedules data to save');
+        }
+        
+        await AsyncStorage.setItem('schedules', schedulesJson);
         console.log('Successfully saved schedules to AsyncStorage');
         
         // Verify the save by reading it back
         const savedData = await AsyncStorage.getItem('schedules');
         if (savedData) {
-          const parsedData = JSON.parse(savedData);
-          console.log('Verified saved schedules count:', parsedData.length);
-          const savedSchedule = parsedData.find((s: any) => s.date === schedule.date);
-          console.log('Verified schedule for date exists:', savedSchedule ? 'YES' : 'NO');
+          try {
+            const trimmed = savedData.trim();
+            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+              const parsedData = JSON.parse(trimmed);
+              console.log('Verified saved schedules count:', parsedData.length);
+              const savedSchedule = parsedData.find((s: any) => s.date === schedule.date);
+              console.log('Verified schedule for date exists:', savedSchedule ? 'YES' : 'NO');
+            } else {
+              console.log('Invalid saved data format during verification');
+            }
+          } catch (parseError) {
+            console.error('Error parsing saved data during verification:', parseError);
+          }
         }
       } catch (error) {
         console.error('Error saving schedule to AsyncStorage:', error);
@@ -260,7 +379,19 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       try {
         const existingUpdates = await AsyncStorage.getItem(`categoryUpdates_${schedule.date}`);
-        const updates = existingUpdates ? JSON.parse(existingUpdates) : [];
+        let updates = [];
+        
+        if (existingUpdates) {
+          try {
+            const trimmed = existingUpdates.trim();
+            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+              updates = JSON.parse(trimmed);
+            }
+          } catch (parseError) {
+            console.error('Error parsing existing category updates:', parseError);
+            updates = [];
+          }
+        }
         
         // Remove any previous schedule update and add the new one
         const filteredUpdates = updates.filter((u: CategoryUpdate) => u.category !== 'schedule');
@@ -431,7 +562,19 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       };
       
       const existingUpdates = await AsyncStorage.getItem(`categoryUpdates_${schedule.date}`);
-      const updates = existingUpdates ? JSON.parse(existingUpdates) : [];
+      let updates = [];
+      
+      if (existingUpdates) {
+        try {
+          const trimmed = existingUpdates.trim();
+          if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+            updates = JSON.parse(trimmed);
+          }
+        } catch (parseError) {
+          console.error('Error parsing category updates:', parseError);
+          updates = [];
+        }
+      }
       
       // Remove any previous update for the same category and add the new one
       const filteredUpdates = updates.filter((u: CategoryUpdate) => u.category !== category);
@@ -531,9 +674,20 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       try {
         const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
         if (updates) {
-          const parsedUpdates = JSON.parse(updates);
-          setCategoryUpdates(parsedUpdates);
-          console.log('Category updates reloaded:', parsedUpdates.length, 'updates');
+          try {
+            const trimmed = updates.trim();
+            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+              const parsedUpdates = JSON.parse(trimmed);
+              setCategoryUpdates(parsedUpdates);
+              console.log('Category updates reloaded:', parsedUpdates.length, 'updates');
+            } else {
+              setCategoryUpdates([]);
+              console.log('Invalid category updates format for date:', selectedDate);
+            }
+          } catch (parseError) {
+            console.error('Error parsing category updates during refresh:', parseError);
+            setCategoryUpdates([]);
+          }
         } else {
           setCategoryUpdates([]);
           console.log('No category updates found for date:', selectedDate);
@@ -548,22 +702,31 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       try {
         const allSchedules = await AsyncStorage.getItem('schedules');
         if (allSchedules) {
-          const parsedSchedules = JSON.parse(allSchedules);
-          console.log('Total schedules in AsyncStorage:', parsedSchedules.length);
-          console.log('Available schedule dates:', parsedSchedules.map((s: any) => s.date));
-          
-          const foundSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
-          console.log('Schedule for current date (' + selectedDate + '):', foundSchedule ? 'FOUND' : 'NOT FOUND');
-          
-          if (foundSchedule) {
-            console.log('Schedule details:', {
-              id: foundSchedule.id,
-              workingStaff: foundSchedule.workingStaff?.length || 0,
-              participants: foundSchedule.attendingParticipants?.length || 0,
-              hasAssignments: foundSchedule.assignments?.length || 0,
-              hasFrontRoomSlots: foundSchedule.frontRoomSlots?.length || 0,
-              hasChoreAssignments: foundSchedule.choreAssignments?.length || 0
-            });
+          try {
+            const trimmed = allSchedules.trim();
+            if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+              const parsedSchedules = JSON.parse(trimmed);
+              console.log('Total schedules in AsyncStorage:', parsedSchedules.length);
+              console.log('Available schedule dates:', parsedSchedules.map((s: any) => s.date));
+              
+              const foundSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
+              console.log('Schedule for current date (' + selectedDate + '):', foundSchedule ? 'FOUND' : 'NOT FOUND');
+              
+              if (foundSchedule) {
+                console.log('Schedule details:', {
+                  id: foundSchedule.id,
+                  workingStaff: foundSchedule.workingStaff?.length || 0,
+                  participants: foundSchedule.attendingParticipants?.length || 0,
+                  hasAssignments: foundSchedule.assignments?.length || 0,
+                  hasFrontRoomSlots: foundSchedule.frontRoomSlots?.length || 0,
+                  hasChoreAssignments: foundSchedule.choreAssignments?.length || 0
+                });
+              }
+            } else {
+              console.log('Invalid schedules data format in AsyncStorage');
+            }
+          } catch (parseError) {
+            console.error('Error parsing schedules during verification:', parseError);
           }
         } else {
           console.log('No schedules found in AsyncStorage');
@@ -632,7 +795,20 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       // Also maintain a list of active codes for cleanup
       const activeCodes = await AsyncStorage.getItem('active_sharing_codes');
-      const codes = activeCodes ? JSON.parse(activeCodes) : [];
+      let codes = [];
+      
+      if (activeCodes) {
+        try {
+          const trimmed = activeCodes.trim();
+          if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+            codes = JSON.parse(trimmed);
+          }
+        } catch (parseError) {
+          console.error('Error parsing active sharing codes:', parseError);
+          codes = [];
+        }
+      }
+      
       codes.push({ code, expiresAt: expiresAt.toISOString() });
       await AsyncStorage.setItem('active_sharing_codes', JSON.stringify(codes));
       
@@ -659,7 +835,18 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         return { success: false, error: 'Code not found. Please check the code and try again.' };
       }
       
-      const sharedSchedule: SharedSchedule = JSON.parse(sharedData);
+      let sharedSchedule: SharedSchedule;
+      
+      try {
+        const trimmed = sharedData.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          return { success: false, error: 'Invalid shared data format.' };
+        }
+        sharedSchedule = JSON.parse(trimmed);
+      } catch (parseError) {
+        console.error('Error parsing shared schedule data:', parseError);
+        return { success: false, error: 'Invalid shared data format.' };
+      }
       
       // Check if code has expired
       const now = new Date();
@@ -696,7 +883,17 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       const activeCodes = await AsyncStorage.getItem('active_sharing_codes');
       if (!activeCodes) return;
       
-      const codes = JSON.parse(activeCodes);
+      let codes = [];
+      
+      try {
+        const trimmed = activeCodes.trim();
+        if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+          codes = JSON.parse(trimmed);
+        }
+      } catch (parseError) {
+        console.error('Error parsing active codes during cleanup:', parseError);
+        codes = [];
+      }
       const now = new Date();
       const validCodes = [];
       
