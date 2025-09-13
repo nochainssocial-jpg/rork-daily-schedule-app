@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   StyleSheet, 
   ScrollView, 
@@ -6,8 +6,7 @@ import {
   Text, 
   TouchableOpacity,
   Image,
-  Animated,
-  PanResponder
+  Alert
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,37 +22,23 @@ import {
   CheckSquare,
   Car,
   ListChecks,
-  Edit,
-  RotateCcw,
-  Calendar,
-  Download
+  Edit
 } from 'lucide-react-native';
 
 export default function HomeScreen() {
   const { 
     selectedDate, 
-    setSelectedDate, 
     setScheduleStep,
     getScheduleForDate,
     categoryUpdates,
     refreshAllData,
     schedules,
-    autoSaveSchedule
+    updateScheduleImmediately
   } = useSchedule();
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
-  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
-  const [showScheduleBrowser, setShowScheduleBrowser] = useState<boolean>(false);
-  
-  // Pull to refresh animation values
-  const pullDistance = useRef(new Animated.Value(0)).current;
-  const refreshOpacity = useRef(new Animated.Value(0)).current;
-  const rotateValue = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef<ScrollView>(null);
-  const isPulling = useRef(false);
-  const PULL_THRESHOLD = 80;
 
   useEffect(() => {
     if (categoryUpdates && categoryUpdates.length > 0) {
@@ -133,8 +118,7 @@ export default function HomeScreen() {
   useEffect(() => {
     const autoRefreshData = async () => {
       // Only auto-refresh if we don't have a schedule for the current date
-      // and we're not already refreshing
-      if (!todaySchedule && !refreshing && schedules.length === 0) {
+      if (!todaySchedule && schedules.length === 0) {
         console.log('Auto-refreshing data on mount/date change...');
         await refreshAllData();
         setForceUpdate(prev => prev + 1);
@@ -145,7 +129,7 @@ export default function HomeScreen() {
     const timeoutId = setTimeout(autoRefreshData, 100);
     
     return () => clearTimeout(timeoutId);
-  }, [selectedDate]); // Only depend on selectedDate to avoid infinite loops
+  }, [selectedDate, todaySchedule, schedules.length, refreshAllData]); // Include all dependencies
   
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -174,199 +158,52 @@ export default function HomeScreen() {
     { id: 'finalChecklist', title: 'Final Checklist', icon: ListChecks, color: '#E56B6F' },
   ];
   
-  // Get the color for the notification based on the latest update
-  // Create pan responder for pull to refresh
-  const panResponder = PanResponder.create({
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      // Only respond to vertical pulls when at the top of the scroll view
-      return gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-    },
-    onPanResponderGrant: () => {
-      isPulling.current = true;
-    },
-    onPanResponderMove: (evt, gestureState) => {
-      if (gestureState.dy > 0 && gestureState.dy <= PULL_THRESHOLD * 2) {
-        const progress = Math.min(gestureState.dy / PULL_THRESHOLD, 1);
-        pullDistance.setValue(gestureState.dy * 0.5);
-        refreshOpacity.setValue(progress);
-        
-        // Rotate icon based on pull progress
-        Animated.timing(rotateValue, {
-          toValue: progress,
-          duration: 0,
-          useNativeDriver: true,
-        }).start();
-      }
-    },
-    onPanResponderRelease: (evt, gestureState) => {
-      isPulling.current = false;
-      
-      if (gestureState.dy >= PULL_THRESHOLD) {
-        // Trigger refresh
-        onRefresh();
-      } else {
-        // Reset animation
-        Animated.parallel([
-          Animated.timing(pullDistance, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(refreshOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(rotateValue, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-      }
-    },
-  });
-
-  const onRefresh = async () => {
-    console.log('=== PULL TO REFRESH TRIGGERED ===');
-    setRefreshing(true);
+  // Load the most recently created schedule
+  const loadLastSchedule = async () => {
+    console.log('Loading last created schedule...');
     
-    // Animate refresh icon rotation
-    const rotationAnimation = Animated.loop(
-      Animated.timing(rotateValue, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      })
-    );
-    rotationAnimation.start();
+    if (schedules.length === 0) {
+      Alert.alert('No Schedules', 'No schedules found to load.');
+      return;
+    }
+    
+    // Find the most recently created schedule
+    const sortedSchedules = [...schedules].sort((a, b) => {
+      // Sort by date (most recent first)
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+    
+    const lastSchedule = sortedSchedules[0];
+    
+    if (lastSchedule.date === selectedDate) {
+      Alert.alert('Already Loaded', 'The most recent schedule is already loaded for today.');
+      return;
+    }
+    
+    // Create a copy of the last schedule for today's date
+    const todaySchedule = {
+      ...lastSchedule,
+      id: `schedule-${selectedDate}`,
+      date: selectedDate
+    };
     
     try {
-      console.log('Starting comprehensive data refresh...');
-      console.log('Current selected date:', selectedDate);
-      console.log('Current schedules before refresh:', schedules.length);
+      // Save the copied schedule for today
+      await updateScheduleImmediately(todaySchedule);
       
-      // Force reload all data from AsyncStorage with improved reliability
-      const refreshSuccess = await refreshAllData();
+      Alert.alert(
+        'Schedule Loaded', 
+        `Successfully loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today.`
+      );
       
-      if (refreshSuccess) {
-        console.log('Data refresh completed successfully');
-        
-        // Force multiple re-renders to ensure data propagation
-        setForceUpdate(prev => prev + 1);
-        
-        // Wait longer for React Query to fully propagate changes
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Force another update to ensure UI reflects the latest data
-        setForceUpdate(prev => prev + 1);
-        
-        // Check if schedule data is now available with retry logic
-        let refreshedSchedule = getScheduleForDate(selectedDate);
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        while (!refreshedSchedule && retryCount < maxRetries) {
-          console.log(`Retry ${retryCount + 1}: Waiting for schedule data to load...`);
-          await new Promise(resolve => setTimeout(resolve, 200));
-          refreshedSchedule = getScheduleForDate(selectedDate);
-          retryCount++;
-        }
-        
-        console.log('Schedule after refresh:', refreshedSchedule ? 'FOUND' : 'NOT FOUND');
-        console.log('Total schedules available after refresh:', schedules.length);
-        
-        if (refreshedSchedule) {
-          console.log('Refreshed schedule details:', {
-            id: refreshedSchedule.id,
-            date: refreshedSchedule.date,
-            workingStaff: refreshedSchedule.workingStaff.length,
-            participants: refreshedSchedule.attendingParticipants.length
-          });
-        } else {
-          console.log('Schedule still not found after retries. Checking AsyncStorage directly...');
-          
-          // Direct AsyncStorage check as fallback
-          try {
-            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-            const storedSchedules = await AsyncStorage.getItem('schedules');
-            if (storedSchedules) {
-              const parsedSchedules = JSON.parse(storedSchedules);
-              const directSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
-              console.log('Direct AsyncStorage check - Schedule found:', directSchedule ? 'YES' : 'NO');
-              
-              if (directSchedule) {
-                console.log('Schedule exists in AsyncStorage but not in React Query state');
-                console.log('This indicates a React Query synchronization issue');
-                
-                // Force one more refresh cycle
-                await refreshAllData();
-                setForceUpdate(prev => prev + 1);
-              }
-            }
-          } catch (directCheckError) {
-            console.error('Error in direct AsyncStorage check:', directCheckError);
-          }
-        }
-      } else {
-        console.log('Data refresh failed');
-      }
-      
-      // Stop rotation animation
-      rotationAnimation.stop();
-      
-      // Reset animations with delay for user feedback
-      setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(pullDistance, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(refreshOpacity, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: false,
-          }),
-          Animated.timing(rotateValue, {
-            toValue: 0,
-            duration: 300,
-            useNativeDriver: true,
-          }),
-        ]).start();
-        
-        setRefreshing(false);
-        console.log('=== REFRESH CYCLE COMPLETED ===');
-      }, 800);
+      setForceUpdate(prev => prev + 1);
     } catch (error) {
-      console.error('Error refreshing data:', error);
-      
-      // Stop rotation animation
-      rotationAnimation.stop();
-      
-      // Reset animations on error
-      Animated.parallel([
-        Animated.timing(pullDistance, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(refreshOpacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: false,
-        }),
-        Animated.timing(rotateValue, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-      
-      setRefreshing(false);
-      console.log('=== REFRESH FAILED ===');
+      console.error('Error loading last schedule:', error);
+      Alert.alert('Error', 'Failed to load the last schedule. Please try again.');
     }
   };
+
+
 
   const getNotificationColor = () => {
     if (!categoryUpdates || categoryUpdates.length === 0) return { bg: '#C8E6C9', text: '#2E7D32' };
@@ -408,7 +245,7 @@ export default function HomeScreen() {
 
   const handleSharePress = () => {
     if (!todaySchedule) {
-      console.log('No schedule available for sharing');
+      Alert.alert('No Schedule', 'Please create a schedule first');
       return;
     }
     router.push('/share-schedule');
@@ -416,7 +253,7 @@ export default function HomeScreen() {
 
   const handleCategoryPress = (categoryId: string) => {
     if (!todaySchedule) {
-      console.log('No schedule available - please create a schedule first');
+      Alert.alert('No Schedule', 'Please create a schedule for today first');
       return;
     }
     
@@ -430,89 +267,6 @@ export default function HomeScreen() {
       pathname: '/edit-schedule',
       params: { category: categoryId }
     });
-  };
-
-  const handleLoadSchedule = async (schedule: any) => {
-    console.log('Loading schedule for date:', schedule.date);
-    
-    // Create a copy of the schedule for today's date
-    const loadedSchedule = {
-      ...schedule,
-      id: `schedule-${selectedDate}`,
-      date: selectedDate
-    };
-    
-    try {
-      // Save the loaded schedule as today's schedule
-      await autoSaveSchedule(loadedSchedule);
-      
-      setShowScheduleBrowser(false);
-      
-      // Show success message without Alert for web compatibility
-      console.log(`Schedule from ${schedule.date} has been loaded for today (${selectedDate})`);
-      
-      // Force refresh to show the loaded schedule
-      await refreshAllData();
-    } catch (error) {
-      console.error('Error loading schedule:', error);
-    }
-  };
-
-  const renderScheduleBrowser = () => {
-    if (!showScheduleBrowser) return null;
-
-    const availableSchedules = schedules.filter((s: any) => s.date !== selectedDate);
-
-    return (
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Load Previous Schedule</Text>
-            <TouchableOpacity 
-              onPress={() => setShowScheduleBrowser(false)}
-              style={styles.closeButton}
-            >
-              <Text style={styles.closeButtonText}>×</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {availableSchedules.length === 0 ? (
-            <View style={styles.noSchedulesContainer}>
-              <Calendar size={48} color="#999" />
-              <Text style={styles.noSchedulesText}>No previous schedules found</Text>
-              <Text style={styles.noSchedulesSubtext}>Create schedules on other dates to load them here</Text>
-            </View>
-          ) : (
-            <ScrollView style={styles.schedulesList}>
-              {availableSchedules.map((schedule: any) => {
-                const scheduleDate = new Date(schedule.date);
-                const dayName = dayNames[scheduleDate.getDay()];
-                const monthName = monthNames[scheduleDate.getMonth()];
-                const dateString = `${scheduleDate.getDate()} ${monthName} ${scheduleDate.getFullYear()}`;
-                
-                return (
-                  <TouchableOpacity
-                    key={schedule.id}
-                    style={styles.scheduleItem}
-                    onPress={() => handleLoadSchedule(schedule)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.scheduleInfo}>
-                      <Text style={styles.scheduleDay}>{dayName}</Text>
-                      <Text style={styles.scheduleDate}>{dateString}</Text>
-                      <Text style={styles.scheduleDetails}>
-                        {schedule.workingStaff?.length || 0} staff • {schedule.attendingParticipants?.length || 0} participants
-                      </Text>
-                    </View>
-                    <Download size={20} color="#4A90E2" />
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    );
   };
 
   return (
@@ -537,17 +291,9 @@ export default function HomeScreen() {
             onCreatePress={handleCreatePress}
             onEditPress={handleEditPress}
             onSharePress={handleSharePress}
+            onLoadLastPress={loadLastSchedule}
+            hasSchedules={schedules.length > 0}
           />
-          
-          {/* Load Schedule Button */}
-          <TouchableOpacity
-            style={styles.loadScheduleButton}
-            onPress={() => setShowScheduleBrowser(true)}
-            activeOpacity={0.7}
-          >
-            <Calendar size={18} color="#4A90E2" />
-            <Text style={styles.loadScheduleText}>Load Previous Schedule</Text>
-          </TouchableOpacity>
         </View>
         
         {lastUpdateTime && (
@@ -563,49 +309,12 @@ export default function HomeScreen() {
           </View>
         )}
 
-        <View style={styles.scrollContainer} {...panResponder.panHandlers}>
-          {/* Pull to refresh indicator */}
-          <Animated.View 
-            style={[
-              styles.refreshIndicator,
-              {
-                height: pullDistance,
-                opacity: refreshOpacity,
-              }
-            ]}
-          >
-            <Animated.View
-              style={[
-                styles.rotatingIcon,
-                {
-                  transform: [{
-                    rotate: rotateValue.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ['0deg', '360deg'],
-                    })
-                  }]
-                }
-              ]}
-            >
-              <RotateCcw size={24} color="#4A90E2" />
-            </Animated.View>
-            <Text style={styles.refreshText}>
-              {refreshing ? 'Refreshing...' : 'Pull to refresh'}
-            </Text>
-          </Animated.View>
+        <View style={styles.scrollContainer}>
           
           {todaySchedule ? (
             <ScrollView 
-              ref={scrollViewRef}
               style={styles.scrollView} 
               showsVerticalScrollIndicator={false}
-              scrollEventThrottle={16}
-              onScroll={(event) => {
-                const { contentOffset } = event.nativeEvent;
-                if (contentOffset.y <= 0 && !isPulling.current) {
-                  // At the top, ready for pull to refresh
-                }
-              }}
             >
               <View style={styles.categoriesContainer}>
                 {categoryItems.map((item) => {
@@ -629,14 +338,15 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <ScrollView 
-              ref={scrollViewRef}
               style={styles.scrollView} 
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.noScheduleContainer}>
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
-                <Text style={styles.refreshHintText}>Pull down to refresh and reload data</Text>
+                {schedules.length > 0 && (
+                  <Text style={styles.loadHintText}>Use &quot;Load Last&quot; button to copy your most recent schedule</Text>
+                )}
                 
                 {/* Debug info for development */}
                 {__DEV__ && (
@@ -657,9 +367,6 @@ export default function HomeScreen() {
           )}
         </View>
       </View>
-      
-      {/* Schedule Browser Modal */}
-      {renderScheduleBrowser()}
     </View>
   );
 }
@@ -788,9 +495,9 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center' as const,
   },
-  refreshHintText: {
+  loadHintText: {
     fontSize: 12,
-    color: '#4A90E2',
+    color: '#2196F3',
     textAlign: 'center' as const,
     marginTop: 8,
     fontStyle: 'italic' as const,
@@ -809,131 +516,5 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-  },
-  refreshIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  refreshText: {
-    fontSize: 14,
-    color: '#4A90E2',
-    fontWeight: '500' as const,
-  },
-  rotatingIcon: {
-    // Base style for rotating icon container
-  },
-  loadScheduleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F0F8FF',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#4A90E2',
-    gap: 6,
-  },
-  loadScheduleText: {
-    fontSize: 14,
-    color: '#4A90E2',
-    fontWeight: '600' as const,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  modalContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '70%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold' as const,
-    color: '#333',
-  },
-  closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 20,
-    color: '#666',
-    fontWeight: 'bold' as const,
-  },
-  noSchedulesContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
-  noSchedulesText: {
-    fontSize: 16,
-    fontWeight: '600' as const,
-    color: '#666',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  noSchedulesSubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center' as const,
-  },
-  schedulesList: {
-    maxHeight: 400,
-  },
-  scheduleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  scheduleInfo: {
-    flex: 1,
-  },
-  scheduleDay: {
-    fontSize: 16,
-    fontWeight: 'bold' as const,
-    color: '#333',
-    marginBottom: 2,
-  },
-  scheduleDate: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  scheduleDetails: {
-    fontSize: 12,
-    color: '#999',
   },
 });
