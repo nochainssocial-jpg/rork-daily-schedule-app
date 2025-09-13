@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
-import { Share } from 'lucide-react-native';
+import { Share, Users } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import * as Sharing from 'expo-sharing';
@@ -80,17 +80,59 @@ export default function ShareScreen() {
     );
   }
 
+  const shareApp = async () => {
+    const appUrl = window.location.origin; // Gets the current web URL
+    const shareText = `Check out this Daily Schedule app! Access it here: ${appUrl}`;
+    
+    if (Platform.OS === 'web') {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Daily Schedule App',
+            text: shareText,
+            url: appUrl,
+          });
+        } catch (error) {
+          console.log('Error sharing app:', error);
+        }
+      } else {
+        navigator.clipboard.writeText(shareText);
+        Alert.alert('Copied', 'App link copied to clipboard! Share it with your colleagues.');
+      }
+    } else {
+      try {
+        await Sharing.shareAsync('data:text/plain;base64,' + btoa(shareText));
+      } catch (error) {
+        console.log('Error sharing app:', error);
+        Alert.alert('Error', 'Unable to share app link');
+      }
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Share Schedule</Text>
-        <Text style={styles.date}>{selectedDate}</Text>
+        <Text style={styles.title}>Share & Collaborate</Text>
+        <Text style={styles.subtitle}>Share the app or today&apos;s schedule</Text>
       </View>
 
-      <TouchableOpacity style={styles.shareButton} onPress={shareSchedule}>
-        <Share size={24} color="white" />
-        <Text style={styles.shareButtonText}>Share Schedule</Text>
-      </TouchableOpacity>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Share App with Colleagues</Text>
+        <TouchableOpacity style={styles.appShareButton} onPress={shareApp}>
+          <Users size={24} color="white" />
+          <Text style={styles.shareButtonText}>Share App Link</Text>
+        </TouchableOpacity>
+        <Text style={styles.helpText}>Share this link so colleagues can access the app instantly</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Share Today&apos;s Schedule</Text>
+        <Text style={styles.date}>{selectedDate}</Text>
+        <TouchableOpacity style={styles.shareButton} onPress={shareSchedule}>
+          <Share size={24} color="white" />
+          <Text style={styles.shareButtonText}>Share Schedule</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.preview}>
         <Text style={styles.previewTitle}>Schedule Preview</Text>
@@ -116,10 +158,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  date: {
+  subtitle: {
     fontSize: 16,
     color: '#666',
     marginTop: 4,
+  },
+  section: {
+    backgroundColor: 'white',
+    margin: 20,
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 0,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  date: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 12,
+  },
+  appShareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2196F3',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  helpText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   shareButton: {
     flexDirection: 'row',
