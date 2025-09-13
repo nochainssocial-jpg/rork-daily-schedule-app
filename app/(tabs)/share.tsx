@@ -76,78 +76,95 @@ export default function ShareScreen() {
     if (Platform.OS === 'web') {
       // Get the current web URL
       if (typeof window !== 'undefined' && window.location) {
-        appUrl = window.location.origin + window.location.pathname;
-        // Remove any hash or query parameters to get clean URL
-        appUrl = appUrl.split('#')[0].split('?')[0];
+        appUrl = window.location.origin;
+        // Ensure we have a clean base URL
+        if (!appUrl.endsWith('/')) {
+          appUrl += '/';
+        }
       } else {
         appUrl = 'https://your-app-domain.com';
       }
-      shareText = `Check out this Daily Schedule app! 📅\n\nAccess it instantly here: ${appUrl}\n\nThis app helps organize staff schedules and participant attendance efficiently.`;
+      shareText = `Check out this Daily Schedule app! 📅\n\n🔗 Access it here: ${appUrl}\n\nThis app helps organize staff schedules and participant attendance efficiently. Perfect for teams!`;
     } else {
-      // For mobile, provide general sharing text
-      shareText = `Check out this Daily Schedule app! 📅\n\nIt helps organize staff schedules and participant attendance efficiently. Perfect for teams and organizations.\n\nDownload it from your app store or ask for the web link!`;
+      // For mobile, we'll use a universal link or provide instructions
+      shareText = `Check out this Daily Schedule app! 📅\n\nIt helps organize staff schedules and participant attendance efficiently. Perfect for teams and organizations.\n\nAsk your admin for the web link or download from your app store!`;
     }
+    
+    console.log('Sharing app with URL:', appUrl);
+    console.log('Share text:', shareText);
     
     try {
       const shareOptions: any = {
         message: shareText,
-        title: 'Daily Schedule App',
+        title: 'Daily Schedule App - Team Collaboration Tool',
       };
       
-      // Add URL for web platforms
+      // For web, include both message and URL
       if (Platform.OS === 'web' && appUrl) {
         shareOptions.url = appUrl;
+        // Some platforms prefer the URL in the message itself
+        shareOptions.message = shareText;
       }
+      
+      console.log('Share options:', shareOptions);
       
       const result = await RNShare.share(shareOptions);
       
+      console.log('Share result:', result);
+      
       if (result.action === RNShare.sharedAction) {
         console.log('App shared successfully');
-        Alert.alert('Success', 'App link shared successfully!');
+        Alert.alert('Success! 🎉', 'App link shared successfully! Your colleagues can now access the app.');
       } else if (result.action === RNShare.dismissedAction) {
-        console.log('Share dismissed');
+        console.log('Share dismissed by user');
       }
     } catch (error) {
-      console.log('Error sharing app:', error);
+      console.error('Error sharing app:', error);
       
       // Enhanced fallback handling
       if (Platform.OS === 'web') {
         // Try clipboard first
         if (navigator.clipboard) {
           try {
-            await navigator.clipboard.writeText(shareText);
+            const textToCopy = `${shareText}\n\nDirect link: ${appUrl}`;
+            await navigator.clipboard.writeText(textToCopy);
             Alert.alert(
-              'Copied to Clipboard', 
-              'App information copied to clipboard! You can now paste and share it with your colleagues.',
-              [{ text: 'OK' }]
+              '📋 Copied to Clipboard!', 
+              'App link and message copied to clipboard! You can now paste and share it with your colleagues.',
+              [{ text: 'Got it!' }]
             );
             return;
           } catch (clipboardError) {
-            console.log('Clipboard error:', clipboardError);
+            console.error('Clipboard error:', clipboardError);
           }
         }
         
         // Final fallback - show the URL in an alert
         Alert.alert(
-          'Share App Link', 
-          `Copy this link to share with colleagues:\n\n${appUrl}\n\nOr copy this message:\n\n${shareText}`,
+          '🔗 Share App Link', 
+          `Copy this information to share with colleagues:\n\n${shareText}\n\n📱 Direct Link:\n${appUrl}`,
           [
             { text: 'Cancel', style: 'cancel' },
             { 
-              text: 'Copy Link', 
+              text: 'Copy All', 
               onPress: () => {
+                const fullText = `${shareText}\n\nDirect Link: ${appUrl}`;
                 if (navigator.clipboard) {
-                  navigator.clipboard.writeText(appUrl).catch(() => {});
+                  navigator.clipboard.writeText(fullText).then(() => {
+                    Alert.alert('Copied!', 'All information copied to clipboard.');
+                  }).catch(() => {
+                    console.log('Failed to copy to clipboard');
+                  });
                 }
               }
             }
           ]
         );
       } else {
-        // Mobile fallback
+        // Mobile fallback - show share text in alert
         Alert.alert(
-          'Share App', 
-          shareText,
+          '📱 Share App Info', 
+          `${shareText}\n\nYou can copy this message and send it manually to your colleagues.`,
           [
             { text: 'OK' }
           ]
