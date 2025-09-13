@@ -113,18 +113,30 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryFn: async () => {
       try {
         const stored = await AsyncStorage.getItem('staff');
-        if (!stored) return DEFAULT_STAFF;
-        
-        // Validate JSON before parsing
-        const trimmed = stored.trim();
-        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-          console.warn('Invalid staff data format, using defaults');
+        if (!stored || stored === 'undefined' || stored === 'null') {
+          console.log('No staff data found, using defaults');
           return DEFAULT_STAFF;
         }
         
-        return JSON.parse(trimmed);
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          console.warn('Invalid staff data format, clearing and using defaults');
+          await AsyncStorage.removeItem('staff');
+          return DEFAULT_STAFF;
+        }
+        
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          console.warn('Staff data is not an array, using defaults');
+          await AsyncStorage.removeItem('staff');
+          return DEFAULT_STAFF;
+        }
+        
+        return parsed;
       } catch (error) {
         console.error('Error parsing staff data:', error);
+        await AsyncStorage.removeItem('staff');
         return DEFAULT_STAFF;
       }
     }
@@ -136,18 +148,30 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryFn: async () => {
       try {
         const stored = await AsyncStorage.getItem('participants');
-        if (!stored) return DEFAULT_PARTICIPANTS;
-        
-        // Validate JSON before parsing
-        const trimmed = stored.trim();
-        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-          console.warn('Invalid participants data format, using defaults');
+        if (!stored || stored === 'undefined' || stored === 'null') {
+          console.log('No participants data found, using defaults');
           return DEFAULT_PARTICIPANTS;
         }
         
-        return JSON.parse(trimmed);
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          console.warn('Invalid participants data format, clearing and using defaults');
+          await AsyncStorage.removeItem('participants');
+          return DEFAULT_PARTICIPANTS;
+        }
+        
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          console.warn('Participants data is not an array, using defaults');
+          await AsyncStorage.removeItem('participants');
+          return DEFAULT_PARTICIPANTS;
+        }
+        
+        return parsed;
       } catch (error) {
         console.error('Error parsing participants data:', error);
+        await AsyncStorage.removeItem('participants');
         return DEFAULT_PARTICIPANTS;
       }
     }
@@ -159,18 +183,30 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryFn: async () => {
       try {
         const stored = await AsyncStorage.getItem('chores');
-        if (!stored) return DEFAULT_CHORES;
-        
-        // Validate JSON before parsing
-        const trimmed = stored.trim();
-        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-          console.warn('Invalid chores data format, using defaults');
+        if (!stored || stored === 'undefined' || stored === 'null') {
+          console.log('No chores data found, using defaults');
           return DEFAULT_CHORES;
         }
         
-        return JSON.parse(trimmed);
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          console.warn('Invalid chores data format, clearing and using defaults');
+          await AsyncStorage.removeItem('chores');
+          return DEFAULT_CHORES;
+        }
+        
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          console.warn('Chores data is not an array, using defaults');
+          await AsyncStorage.removeItem('chores');
+          return DEFAULT_CHORES;
+        }
+        
+        return parsed;
       } catch (error) {
         console.error('Error parsing chores data:', error);
+        await AsyncStorage.removeItem('chores');
         return DEFAULT_CHORES;
       }
     }
@@ -182,18 +218,30 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryFn: async () => {
       try {
         const stored = await AsyncStorage.getItem('checklist');
-        if (!stored) return DEFAULT_CHECKLIST;
-        
-        // Validate JSON before parsing
-        const trimmed = stored.trim();
-        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-          console.warn('Invalid checklist data format, using defaults');
+        if (!stored || stored === 'undefined' || stored === 'null') {
+          console.log('No checklist data found, using defaults');
           return DEFAULT_CHECKLIST;
         }
         
-        return JSON.parse(trimmed);
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          console.warn('Invalid checklist data format, clearing and using defaults');
+          await AsyncStorage.removeItem('checklist');
+          return DEFAULT_CHECKLIST;
+        }
+        
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          console.warn('Checklist data is not an array, using defaults');
+          await AsyncStorage.removeItem('checklist');
+          return DEFAULT_CHECKLIST;
+        }
+        
+        return parsed;
       } catch (error) {
         console.error('Error parsing checklist data:', error);
+        await AsyncStorage.removeItem('checklist');
         return DEFAULT_CHECKLIST;
       }
     }
@@ -205,18 +253,30 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryFn: async () => {
       try {
         const stored = await AsyncStorage.getItem('schedules');
-        if (!stored) return [];
-        
-        // Validate JSON before parsing
-        const trimmed = stored.trim();
-        if (!trimmed || !trimmed.startsWith('[') && !trimmed.startsWith('{')) {
-          console.warn('Invalid schedules data format, using empty array');
+        if (!stored || stored === 'undefined' || stored === 'null') {
+          console.log('No schedules data found, using empty array');
           return [];
         }
         
-        return JSON.parse(trimmed);
+        // Validate JSON before parsing
+        const trimmed = stored.trim();
+        if (!trimmed || (!trimmed.startsWith('[') && !trimmed.startsWith('{'))) {
+          console.warn('Invalid schedules data format, clearing and using empty array');
+          await AsyncStorage.removeItem('schedules');
+          return [];
+        }
+        
+        const parsed = JSON.parse(trimmed);
+        if (!Array.isArray(parsed)) {
+          console.warn('Schedules data is not an array, using empty array');
+          await AsyncStorage.removeItem('schedules');
+          return [];
+        }
+        
+        return parsed;
       } catch (error) {
         console.error('Error parsing schedules data:', error);
+        await AsyncStorage.removeItem('schedules');
         return [];
       }
     }
@@ -325,8 +385,16 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         const schedulesJson = JSON.stringify(schedules);
         
         // Validate the JSON before saving
-        if (!schedulesJson || schedulesJson === 'undefined' || schedulesJson === 'null') {
+        if (!schedulesJson || schedulesJson === 'undefined' || schedulesJson === 'null' || schedulesJson.trim() === '') {
           throw new Error('Invalid schedules data to save');
+        }
+        
+        // Test parse to ensure valid JSON
+        try {
+          JSON.parse(schedulesJson);
+        } catch (parseError) {
+          console.error('Generated invalid JSON for schedules:', parseError);
+          throw new Error('Generated invalid JSON for schedules');
         }
         
         await AsyncStorage.setItem('schedules', schedulesJson);
@@ -875,6 +943,49 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     }
   }, []);
 
+  // Clear all corrupted data and reset to defaults
+  const clearCorruptedData = useCallback(async () => {
+    console.log('Clearing all corrupted data and resetting to defaults...');
+    try {
+      const keysToRemove = [
+        'staff',
+        'participants', 
+        'chores',
+        'checklist',
+        'schedules',
+        'criticalUpdates',
+        'active_sharing_codes'
+      ];
+      
+      // Remove all potentially corrupted keys
+      await Promise.all(keysToRemove.map(key => AsyncStorage.removeItem(key)));
+      
+      // Clear all category updates
+      const allKeys = await AsyncStorage.getAllKeys();
+      const categoryUpdateKeys = allKeys.filter(key => key.startsWith('categoryUpdates_'));
+      const sharedKeys = allKeys.filter(key => key.startsWith('shared_'));
+      
+      await Promise.all([
+        ...categoryUpdateKeys.map(key => AsyncStorage.removeItem(key)),
+        ...sharedKeys.map(key => AsyncStorage.removeItem(key))
+      ]);
+      
+      // Clear React Query cache
+      queryClient.clear();
+      
+      // Reset local state
+      setCategoryUpdates([]);
+      setCurrentSchedule(null);
+      setScheduleStep(1);
+      
+      console.log('All corrupted data cleared successfully');
+      return true;
+    } catch (error) {
+      console.error('Error clearing corrupted data:', error);
+      return false;
+    }
+  }, [queryClient]);
+
   // Run cleanup on app start
   useEffect(() => {
     cleanupExpiredCodes();
@@ -924,6 +1035,9 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     // Sharing functions
     shareScheduleWithCode,
     importScheduleWithCode,
-    cleanupExpiredCodes
+    cleanupExpiredCodes,
+    
+    // Utility functions
+    clearCorruptedData
   };
 });
