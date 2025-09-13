@@ -70,42 +70,88 @@ export default function ShareScreen() {
   }
 
   const shareApp = async () => {
-    let appUrl = 'https://your-app-url.com';
+    let appUrl = '';
     let shareText = '';
     
     if (Platform.OS === 'web') {
+      // Get the current web URL
       if (typeof window !== 'undefined' && window.location) {
-        appUrl = window.location.href;
+        appUrl = window.location.origin + window.location.pathname;
+        // Remove any hash or query parameters to get clean URL
+        appUrl = appUrl.split('#')[0].split('?')[0];
+      } else {
+        appUrl = 'https://your-app-domain.com';
       }
-      shareText = `Check out this Daily Schedule app! Access it here: ${appUrl}`;
+      shareText = `Check out this Daily Schedule app! 📅\n\nAccess it instantly here: ${appUrl}\n\nThis app helps organize staff schedules and participant attendance efficiently.`;
     } else {
-      shareText = 'Check out this Daily Schedule app! It helps organize staff schedules and participant attendance. Download it from your app store.';
+      // For mobile, provide general sharing text
+      shareText = `Check out this Daily Schedule app! 📅\n\nIt helps organize staff schedules and participant attendance efficiently. Perfect for teams and organizations.\n\nDownload it from your app store or ask for the web link!`;
     }
     
     try {
-      const result = await RNShare.share({
+      const shareOptions: any = {
         message: shareText,
         title: 'Daily Schedule App',
-        ...(Platform.OS === 'web' && { url: appUrl })
-      });
+      };
+      
+      // Add URL for web platforms
+      if (Platform.OS === 'web' && appUrl) {
+        shareOptions.url = appUrl;
+      }
+      
+      const result = await RNShare.share(shareOptions);
       
       if (result.action === RNShare.sharedAction) {
         console.log('App shared successfully');
+        Alert.alert('Success', 'App link shared successfully!');
+      } else if (result.action === RNShare.dismissedAction) {
+        console.log('Share dismissed');
       }
     } catch (error) {
       console.log('Error sharing app:', error);
       
-      // Fallback to clipboard for web
-      if (Platform.OS === 'web' && navigator.clipboard) {
-        try {
-          await navigator.clipboard.writeText(shareText);
-          Alert.alert('Copied', 'App link copied to clipboard! Share it with your colleagues.');
-        } catch (clipboardError) {
-          console.log('Clipboard error:', clipboardError);
-          Alert.alert('Error', 'Unable to share or copy app link. Please copy this URL manually: ' + appUrl);
+      // Enhanced fallback handling
+      if (Platform.OS === 'web') {
+        // Try clipboard first
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(shareText);
+            Alert.alert(
+              'Copied to Clipboard', 
+              'App information copied to clipboard! You can now paste and share it with your colleagues.',
+              [{ text: 'OK' }]
+            );
+            return;
+          } catch (clipboardError) {
+            console.log('Clipboard error:', clipboardError);
+          }
         }
+        
+        // Final fallback - show the URL in an alert
+        Alert.alert(
+          'Share App Link', 
+          `Copy this link to share with colleagues:\n\n${appUrl}\n\nOr copy this message:\n\n${shareText}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { 
+              text: 'Copy Link', 
+              onPress: () => {
+                if (navigator.clipboard) {
+                  navigator.clipboard.writeText(appUrl).catch(() => {});
+                }
+              }
+            }
+          ]
+        );
       } else {
-        Alert.alert('Error', 'Unable to share app link');
+        // Mobile fallback
+        Alert.alert(
+          'Share App', 
+          shareText,
+          [
+            { text: 'OK' }
+          ]
+        );
       }
     }
   };
