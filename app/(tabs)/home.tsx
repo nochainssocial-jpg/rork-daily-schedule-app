@@ -277,6 +277,7 @@ export default function HomeScreen() {
           source={{ uri: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/sfl62jz9efty7wm6r3s5e' }}
           style={styles.logo}
           resizeMode="contain"
+          defaultSource={{ uri: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' }}
         />
       </View>
       
@@ -345,7 +346,7 @@ export default function HomeScreen() {
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
                 {schedules.length > 0 && (
-                  <Text style={styles.loadHintText}>Use "Load Last" button to copy your most recent schedule</Text>
+                  <Text style={styles.loadHintText}>Use &quot;Load Last&quot; button to copy your most recent schedule</Text>
                 )}
                 
                 {/* Debug info for development */}

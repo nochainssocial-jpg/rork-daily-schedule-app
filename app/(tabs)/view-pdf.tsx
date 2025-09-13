@@ -460,7 +460,7 @@ export default function ViewPDFScreen() {
             
             // Write the PDF content to a file
             await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-              encoding: FileSystem.EncodingType.Base64,
+              encoding: 'base64' as any,
             });
             
             // Check if sharing is available
