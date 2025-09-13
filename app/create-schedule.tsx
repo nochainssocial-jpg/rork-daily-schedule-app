@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { Stack, router } from 'expo-router';
 import { ChevronRight, Check, X } from 'lucide-react-native';
@@ -31,7 +31,7 @@ export default function CreateScheduleScreen() {
   const [workingStaff, setWorkingStaff] = useState<string[]>([]);
   const [attendingParticipants, setAttendingParticipants] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [currentAssignmentIndex, setCurrentAssignmentIndex] = useState<number>(0);
+
   const [finalChecklistStaff, setFinalChecklistStaff] = useState<string>('');
 
   const toggleStaffSelection = (staffId: string) => {
@@ -96,7 +96,7 @@ export default function CreateScheduleScreen() {
     };
   }, [scheduleStep]);
 
-  const canProceedToNextStep = () => {
+  const canProceedToNextStep = useMemo(() => {
     switch (scheduleStep) {
       case 1:
         return workingStaff.length > 0;
@@ -113,9 +113,9 @@ export default function CreateScheduleScreen() {
       default:
         return false;
     }
-  };
+  }, [scheduleStep, workingStaff.length, attendingParticipants, assignments, finalChecklistStaff]);
 
-  const handleNextStep = () => {
+  const handleNextStep = useCallback(() => {
     console.log('handleNextStep called, current step:', scheduleStep);
     
     switch (scheduleStep) {
@@ -183,7 +183,7 @@ export default function CreateScheduleScreen() {
         console.log('Unknown step:', scheduleStep);
         break;
     }
-  };
+  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff, createSchedule, setScheduleStep]);
 
   const assignParticipantToStaff = (staffId: string, participantId: string) => {
     setAssignments(prev => prev.map(assignment => {
@@ -448,9 +448,9 @@ export default function CreateScheduleScreen() {
           headerLeft: () => (
             <TouchableOpacity 
               onPress={handleBackStep}
-              style={{ paddingHorizontal: 10 }}
+              style={styles.headerButton}
             >
-              <Text style={{ color: '#007AFF', fontSize: 17 }}>
+              <Text style={styles.headerButtonText}>
                 {scheduleStep === 1 ? 'Back' : 'Previous'}
               </Text>
             </TouchableOpacity>
@@ -458,7 +458,7 @@ export default function CreateScheduleScreen() {
           headerRight: () => (
             <TouchableOpacity 
               onPress={handleCancel}
-              style={{ paddingHorizontal: 10 }}
+              style={styles.headerButton}
             >
               <X size={24} color="#FF3B30" />
             </TouchableOpacity>
@@ -491,19 +491,19 @@ export default function CreateScheduleScreen() {
           {renderStepContent()}
 
           <TouchableOpacity 
-            style={[styles.nextButton, !canProceedToNextStep() && styles.nextButtonDisabled]} 
+            style={[styles.nextButton, !canProceedToNextStep && styles.nextButtonDisabled]} 
             onPress={() => {
-              console.log('Next button pressed, canProceed:', canProceedToNextStep());
-              if (canProceedToNextStep()) {
+              console.log('Next button pressed, canProceed:', canProceedToNextStep);
+              if (canProceedToNextStep) {
                 handleNextStep();
               }
             }}
-            activeOpacity={canProceedToNextStep() ? 0.7 : 1}
+            activeOpacity={canProceedToNextStep ? 0.7 : 1}
           >
-            <Text style={[styles.nextButtonText, !canProceedToNextStep() && styles.nextButtonTextDisabled]}>
+            <Text style={[styles.nextButtonText, !canProceedToNextStep && styles.nextButtonTextDisabled]}>
               {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
             </Text>
-            <ChevronRight size={20} color={canProceedToNextStep() ? "white" : "#999"} />
+            <ChevronRight size={20} color={canProceedToNextStep ? "white" : "#999"} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -717,5 +717,12 @@ const styles = StyleSheet.create({
   },
   nextButtonTextDisabled: {
     color: '#999',
+  },
+  headerButton: {
+    paddingHorizontal: 10,
+  },
+  headerButtonText: {
+    color: '#007AFF',
+    fontSize: 17,
   },
 });
