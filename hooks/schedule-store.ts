@@ -18,7 +18,7 @@ interface CategoryUpdate {
 export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const queryClient = useQueryClient();
   const [currentSchedule, setCurrentSchedule] = useState<Schedule | null>(null);
-  const [scheduleStep, setScheduleStep] = useState<number>(0);
+  const [scheduleStep, setScheduleStep] = useState<number>(1);
   const [appVersion, setAppVersion] = useState<string>(APP_VERSION);
   const [lastViewedVersion, setLastViewedVersion] = useState<string>('');
   const [hasNewUpdates, setHasNewUpdates] = useState<boolean>(false);

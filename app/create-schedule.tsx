@@ -15,6 +15,13 @@ export default function CreateScheduleScreen() {
     selectedDate 
   } = useSchedule();
   
+  // Ensure we start at step 1 when component mounts
+  useEffect(() => {
+    if (scheduleStep !== 1) {
+      setScheduleStep(1);
+    }
+  }, [scheduleStep, setScheduleStep]);
+  
   // Check if selected date is Saturday
   const isSaturday = () => {
     // selectedDate is in YYYY-MM-DD format
@@ -90,6 +97,25 @@ export default function CreateScheduleScreen() {
       }
     };
   }, [scheduleStep]);
+
+  const canProceedToNextStep = () => {
+    switch (scheduleStep) {
+      case 1:
+        return workingStaff.length > 0;
+      case 2:
+        return attendingParticipants.length > 0;
+      case 3:
+        const assignedParticipants = assignments.flatMap(a => a.participantIds);
+        const unassignedParticipants = attendingParticipants.filter(p => !assignedParticipants.includes(p));
+        return unassignedParticipants.length === 0;
+      case 4:
+        return true;
+      case 5:
+        return finalChecklistStaff !== '';
+      default:
+        return false;
+    }
+  };
 
   const handleNextStep = () => {
     switch (scheduleStep) {
@@ -453,11 +479,15 @@ export default function CreateScheduleScreen() {
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {renderStepContent()}
 
-          <TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
-            <Text style={styles.nextButtonText}>
+          <TouchableOpacity 
+            style={[styles.nextButton, !canProceedToNextStep() && styles.nextButtonDisabled]} 
+            onPress={handleNextStep}
+            disabled={!canProceedToNextStep()}
+          >
+            <Text style={[styles.nextButtonText, !canProceedToNextStep() && styles.nextButtonTextDisabled]}>
               {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
             </Text>
-            <ChevronRight size={20} color="white" />
+            <ChevronRight size={20} color={canProceedToNextStep() ? "white" : "#999"} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -664,5 +694,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  nextButtonDisabled: {
+    backgroundColor: '#E0E0E0',
+    opacity: 0.6,
+  },
+  nextButtonTextDisabled: {
+    color: '#999',
   },
 });
