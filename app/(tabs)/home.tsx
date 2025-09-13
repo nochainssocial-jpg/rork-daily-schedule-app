@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   StyleSheet, 
   ScrollView, 
@@ -6,7 +6,9 @@ import {
   Text, 
   TouchableOpacity,
   Image,
-  Alert
+  Alert,
+  Animated,
+  PanResponder
 } from 'react-native';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -22,7 +24,8 @@ import {
   CheckSquare,
   Car,
   ListChecks,
-  Edit
+  Edit,
+  RotateCcw
 } from 'lucide-react-native';
 
 export default function HomeScreen() {
@@ -30,13 +33,21 @@ export default function HomeScreen() {
     selectedDate, 
     setSelectedDate, 
     setScheduleStep,
-    schedules,
     getScheduleForDate,
     categoryUpdates
   } = useSchedule();
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+  
+  // Pull to refresh animation values
+  const pullDistance = useRef(new Animated.Value(0)).current;
+  const refreshOpacity = useRef(new Animated.Value(0)).current;
+  const rotateValue = useRef(new Animated.Value(0)).current;
+  const scrollViewRef = useRef<ScrollView>(null);
+  const isPulling = useRef(false);
+  const PULL_THRESHOLD = 80;
 
   useEffect(() => {
     if (categoryUpdates && categoryUpdates.length > 0) {
@@ -110,6 +121,126 @@ export default function HomeScreen() {
   ];
   
   // Get the color for the notification based on the latest update
+  // Create pan responder for pull to refresh
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (evt, gestureState) => {
+      // Only respond to vertical pulls when at the top of the scroll view
+      return gestureState.dy > 0 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+    },
+    onPanResponderGrant: () => {
+      isPulling.current = true;
+    },
+    onPanResponderMove: (evt, gestureState) => {
+      if (gestureState.dy > 0 && gestureState.dy <= PULL_THRESHOLD * 2) {
+        const progress = Math.min(gestureState.dy / PULL_THRESHOLD, 1);
+        pullDistance.setValue(gestureState.dy * 0.5);
+        refreshOpacity.setValue(progress);
+        
+        // Rotate icon based on pull progress
+        Animated.timing(rotateValue, {
+          toValue: progress,
+          duration: 0,
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+    onPanResponderRelease: (evt, gestureState) => {
+      isPulling.current = false;
+      
+      if (gestureState.dy >= PULL_THRESHOLD) {
+        // Trigger refresh
+        onRefresh();
+      } else {
+        // Reset animation
+        Animated.parallel([
+          Animated.timing(pullDistance, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(refreshOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(rotateValue, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+      }
+    },
+  });
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    // Animate refresh icon rotation
+    Animated.loop(
+      Animated.timing(rotateValue, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+    
+    try {
+      // Force reload schedule data by updating the selected date
+      // This will trigger the useEffect in schedule-store to reload category updates
+      const currentDate = selectedDate;
+      setSelectedDate('');
+      
+      // Small delay to ensure state change is processed
+      setTimeout(() => {
+        setSelectedDate(currentDate);
+        
+        // Reset animations
+        Animated.parallel([
+          Animated.timing(pullDistance, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(refreshOpacity, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: false,
+          }),
+          Animated.timing(rotateValue, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        
+        setRefreshing(false);
+      }, 1000);
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      setRefreshing(false);
+      
+      // Reset animations on error
+      Animated.parallel([
+        Animated.timing(pullDistance, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(refreshOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: false,
+        }),
+        Animated.timing(rotateValue, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  };
+
   const getNotificationColor = () => {
     if (!categoryUpdates || categoryUpdates.length === 0) return { bg: '#C8E6C9', text: '#2E7D32' };
     
@@ -212,34 +343,84 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {todaySchedule ? (
-          <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-            <View style={styles.categoriesContainer}>
-              {categoryItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.categoryItem}
-                    onPress={() => handleCategoryPress(item.id)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-                      <Icon size={24} color={item.color} />
-                    </View>
-                    <Text style={styles.categoryTitle}>{item.title}</Text>
-                    <Edit size={22} color="#999" />
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-        ) : (
-          <View style={styles.noScheduleContainer}>
-            <Text style={styles.noScheduleText}>No schedule created for today</Text>
-            <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
-          </View>
-        )}
+        <View style={styles.scrollContainer} {...panResponder.panHandlers}>
+          {/* Pull to refresh indicator */}
+          <Animated.View 
+            style={[
+              styles.refreshIndicator,
+              {
+                height: pullDistance,
+                opacity: refreshOpacity,
+              }
+            ]}
+          >
+            <Animated.View
+              style={[
+                styles.rotatingIcon,
+                {
+                  transform: [{
+                    rotate: rotateValue.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0deg', '360deg'],
+                    })
+                  }]
+                }
+              ]}
+            >
+              <RotateCcw size={24} color="#4A90E2" />
+            </Animated.View>
+            <Text style={styles.refreshText}>
+              {refreshing ? 'Refreshing...' : 'Pull to refresh'}
+            </Text>
+          </Animated.View>
+          
+          {todaySchedule ? (
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.scrollView} 
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={(event) => {
+                const { contentOffset } = event.nativeEvent;
+                if (contentOffset.y <= 0 && !isPulling.current) {
+                  // At the top, ready for pull to refresh
+                }
+              }}
+            >
+              <View style={styles.categoriesContainer}>
+                {categoryItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.categoryItem}
+                      onPress={() => handleCategoryPress(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+                        <Icon size={24} color={item.color} />
+                      </View>
+                      <Text style={styles.categoryTitle}>{item.title}</Text>
+                      <Edit size={22} color="#999" />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          ) : (
+            <ScrollView 
+              ref={scrollViewRef}
+              style={styles.scrollView} 
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.noScheduleContainer}>
+                <Text style={styles.noScheduleText}>No schedule created for today</Text>
+                <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
+                <Text style={styles.refreshHintText}>Pull down to refresh</Text>
+              </View>
+            </ScrollView>
+          )}
+        </View>
       </View>
     </View>
   );
@@ -368,5 +549,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center' as const,
+  },
+  refreshHintText: {
+    fontSize: 12,
+    color: '#4A90E2',
+    textAlign: 'center' as const,
+    marginTop: 8,
+    fontStyle: 'italic' as const,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  refreshIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    gap: 8,
+  },
+  refreshText: {
+    fontSize: 14,
+    color: '#4A90E2',
+    fontWeight: '500' as const,
+  },
+  rotatingIcon: {
+    // Base style for rotating icon container
   },
 });
