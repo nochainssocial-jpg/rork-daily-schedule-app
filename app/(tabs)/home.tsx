@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
-  const [forceUpdate, setForceUpdate] = useState<number>(0);
+
 
   useEffect(() => {
     if (categoryUpdates && categoryUpdates.length > 0) {
@@ -90,7 +90,7 @@ export default function HomeScreen() {
     console.log('Selected date:', selectedDate);
     console.log('Today schedule:', todaySchedule ? 'Found' : 'Not found');
     console.log('Total schedules:', schedules.length);
-    console.log('Force update counter:', forceUpdate);
+
     
     if (todaySchedule) {
       console.log('Schedule details:', {
@@ -112,7 +112,7 @@ export default function HomeScreen() {
     }
     
     console.log('========================');
-  }, [selectedDate, todaySchedule, schedules, forceUpdate]);
+  }, [selectedDate, todaySchedule, schedules]);
   
   // Auto-refresh data when component mounts or date changes
   useEffect(() => {
@@ -121,7 +121,7 @@ export default function HomeScreen() {
       if (!todaySchedule && schedules.length === 0) {
         console.log('Auto-refreshing data on mount/date change...');
         await refreshAllData();
-        setForceUpdate(prev => prev + 1);
+
       }
     };
     
@@ -196,7 +196,7 @@ export default function HomeScreen() {
         `Successfully loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today.`
       );
       
-      setForceUpdate(prev => prev + 1);
+      // Force update removed - no longer needed
     } catch (error) {
       console.error('Error loading last schedule:', error);
       Alert.alert('Error', 'Failed to load the last schedule. Please try again.');
@@ -270,7 +270,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View key={`home-${forceUpdate}`} style={styles.container}>
+    <View style={styles.container}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.headerTitle}>Daily Schedule</Text>
         <Image 
@@ -346,7 +346,7 @@ export default function HomeScreen() {
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
                 {schedules.length > 0 && (
-                  <Text style={styles.loadHintText}>Use "Load Last" button to copy your most recent schedule</Text>
+                  <Text style={styles.loadHintText}>Use &quot;Load Last&quot; button to copy your most recent schedule</Text>
                 )}
                 
                 {/* Debug info for development */}
@@ -355,7 +355,7 @@ export default function HomeScreen() {
                     <Text style={styles.debugText}>Debug Info:</Text>
                     <Text style={styles.debugText}>Date: {selectedDate}</Text>
                     <Text style={styles.debugText}>Total Schedules: {schedules.length}</Text>
-                    <Text style={styles.debugText}>Force Update: {forceUpdate}</Text>
+
                     {schedules.length > 0 && (
                       <Text style={styles.debugText}>
                         Available: {schedules.map((s: any) => s.date).join(', ')}
