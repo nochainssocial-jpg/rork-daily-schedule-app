@@ -98,17 +98,27 @@ export default function HomeScreen() {
   
   // Debug logging
   useEffect(() => {
-    console.log('Home screen - Selected date:', selectedDate);
-    console.log('Home screen - Today schedule:', todaySchedule ? 'Found' : 'Not found');
-    console.log('Home screen - Total schedules:', schedules.length);
-    console.log('Home screen - Force update counter:', forceUpdate);
+    console.log('=== HOME SCREEN DEBUG ===');
+    console.log('Selected date:', selectedDate);
+    console.log('Today schedule:', todaySchedule ? 'Found' : 'Not found');
+    console.log('Total schedules:', schedules.length);
+    console.log('Force update counter:', forceUpdate);
+    
     if (todaySchedule) {
-      console.log('Schedule ID:', todaySchedule.id);
-      console.log('Schedule date:', todaySchedule.date);
+      console.log('Schedule details:', {
+        id: todaySchedule.id,
+        date: todaySchedule.date,
+        workingStaff: todaySchedule.workingStaff.length,
+        participants: todaySchedule.attendingParticipants.length
+      });
     }
+    
     if (schedules.length > 0) {
-      console.log('Available schedule dates:', schedules.map((s: any) => s.date));
+      console.log('Available schedule dates:', schedules.map((s: any) => ({ date: s.date, id: s.id })));
+    } else {
+      console.log('No schedules available in state');
     }
+    console.log('========================');
   }, [selectedDate, todaySchedule, schedules, forceUpdate]);
   
   // Parse the date string and create a date object
@@ -206,6 +216,9 @@ export default function HomeScreen() {
     
     try {
       console.log('Starting data refresh...');
+      console.log('Current selected date:', selectedDate);
+      console.log('Current schedules before refresh:', schedules.length);
+      
       // Force reload all data from AsyncStorage by calling the refresh function from schedule store
       await refreshAllData();
       console.log('Data refresh completed, checking schedule for date:', selectedDate);
@@ -213,13 +226,22 @@ export default function HomeScreen() {
       // Force component re-render to pick up fresh data
       setForceUpdate(prev => prev + 1);
       
-      // Small delay to allow React Query to update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Wait longer for React Query to update
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       // Check if schedule data is now available
       const refreshedSchedule = getScheduleForDate(selectedDate);
       console.log('Schedule after refresh:', refreshedSchedule ? 'Found' : 'Not found');
-      console.log('Total schedules available:', schedules.length);
+      console.log('Total schedules available after refresh:', schedules.length);
+      
+      if (refreshedSchedule) {
+        console.log('Refreshed schedule details:', {
+          id: refreshedSchedule.id,
+          date: refreshedSchedule.date,
+          workingStaff: refreshedSchedule.workingStaff.length,
+          participants: refreshedSchedule.attendingParticipants.length
+        });
+      }
       
       // Small delay for user feedback
       setTimeout(() => {

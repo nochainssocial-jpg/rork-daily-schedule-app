@@ -446,23 +446,22 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     console.log('Refreshing all data from AsyncStorage...');
     
     try {
-      // First, invalidate all queries to force fresh data fetch from AsyncStorage
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['staff'] }),
-        queryClient.invalidateQueries({ queryKey: ['participants'] }),
-        queryClient.invalidateQueries({ queryKey: ['chores'] }),
-        queryClient.invalidateQueries({ queryKey: ['checklist'] }),
-        queryClient.invalidateQueries({ queryKey: ['schedules'] })
-      ]);
+      // Clear React Query cache completely to force fresh data
+      queryClient.clear();
       
-      // Wait for queries to refetch
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['staff'] }),
-        queryClient.refetchQueries({ queryKey: ['participants'] }),
-        queryClient.refetchQueries({ queryKey: ['chores'] }),
-        queryClient.refetchQueries({ queryKey: ['checklist'] }),
-        queryClient.refetchQueries({ queryKey: ['schedules'] })
-      ]);
+      // Wait a moment for cache to clear
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Force refetch all queries with fresh data from AsyncStorage
+      const refreshPromises = [
+        queryClient.refetchQueries({ queryKey: ['staff'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['participants'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['chores'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['checklist'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['schedules'], type: 'active' })
+      ];
+      
+      await Promise.all(refreshPromises);
       
       // Reload category updates for current date
       const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
@@ -472,6 +471,18 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       } else {
         setCategoryUpdates([]);
         console.log('No category updates found for date:', selectedDate);
+      }
+      
+      // Log all available schedules after refresh
+      const allSchedules = await AsyncStorage.getItem('schedules');
+      if (allSchedules) {
+        const parsedSchedules = JSON.parse(allSchedules);
+        console.log('All schedules in AsyncStorage after refresh:', parsedSchedules.map((s: any) => ({ date: s.date, id: s.id })));
+        console.log('Looking for schedule with date:', selectedDate);
+        const foundSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
+        console.log('Found schedule for current date:', foundSchedule ? 'YES' : 'NO');
+      } else {
+        console.log('No schedules found in AsyncStorage');
       }
       
       console.log('Data refresh completed successfully');
