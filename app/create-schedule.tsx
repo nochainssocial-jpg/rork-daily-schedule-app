@@ -18,7 +18,7 @@ export default function CreateScheduleScreen() {
   // Ensure we start at step 1 when component mounts
   useEffect(() => {
     setScheduleStep(1);
-  }, []);
+  }, [setScheduleStep]);
   
   // Check if selected date is Saturday
   const isSaturday = () => {
@@ -80,21 +80,7 @@ export default function CreateScheduleScreen() {
     );
   };
 
-  // Override hardware back button behavior
-  useEffect(() => {
-    const unsubscribe = router.canGoBack() ? 
-      (() => {
-        // This will be called when back button is pressed
-        handleBackStep();
-        return true; // Prevent default back behavior
-      }) : undefined;
-    
-    return () => {
-      if (unsubscribe) {
-        // Clean up
-      }
-    };
-  }, [scheduleStep]);
+
 
   // Stable calculation of whether we can proceed to next step
   const canProceedToNextStep = useMemo(() => {
@@ -114,7 +100,7 @@ export default function CreateScheduleScreen() {
       default:
         return false;
     }
-  }, [scheduleStep, workingStaff.length, attendingParticipants.length, assignments, finalChecklistStaff]);
+  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff]);
 
   const handleNextStep = useCallback(() => {
     console.log('handleNextStep called, current step:', scheduleStep);
@@ -492,22 +478,32 @@ export default function CreateScheduleScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.scrollViewContent}
+          removeClippedSubviews={false}
+          scrollEventThrottle={16}
         >
           {renderStepContent()}
         </ScrollView>
         
         <View style={styles.nextButtonContainer}>
-          <TouchableOpacity 
-            style={[styles.nextButton, !canProceedToNextStep && styles.nextButtonDisabled]} 
-            onPress={handleNextStep}
-            activeOpacity={canProceedToNextStep ? 0.7 : 1}
-            disabled={!canProceedToNextStep}
-          >
-            <Text style={[styles.nextButtonText, !canProceedToNextStep && styles.nextButtonTextDisabled]}>
-              {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
-            </Text>
-            <ChevronRight size={20} color={canProceedToNextStep ? "white" : "#999"} />
-          </TouchableOpacity>
+          {canProceedToNextStep ? (
+            <TouchableOpacity 
+              style={styles.nextButton} 
+              onPress={handleNextStep}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.nextButtonText}>
+                {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
+              </Text>
+              <ChevronRight size={20} color="white" />
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.nextButton, styles.nextButtonDisabled]}>
+              <Text style={[styles.nextButtonText, styles.nextButtonTextDisabled]}>
+                {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
+              </Text>
+              <ChevronRight size={20} color="#999" />
+            </View>
+          )}
         </View>
       </View>
     </>
