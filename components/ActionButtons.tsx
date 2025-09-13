@@ -1,16 +1,18 @@
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
-import { Plus, Edit, Share, Download } from 'lucide-react-native';
+import { Plus, Edit, Share, Download, RefreshCw } from 'lucide-react-native';
 
 interface ActionButtonsProps {
   onCreatePress: () => void;
   onEditPress: () => void;
   onSharePress: () => void;
   onLoadLastPress: () => void;
+  onRefreshPress: () => void;
   hasSchedules: boolean;
+  isRefreshing?: boolean;
 }
 
-export default function ActionButtons({ onCreatePress, onEditPress, onSharePress, onLoadLastPress, hasSchedules }: ActionButtonsProps) {
+export default function ActionButtons({ onCreatePress, onEditPress, onSharePress, onLoadLastPress, onRefreshPress, hasSchedules, isRefreshing = false }: ActionButtonsProps) {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={[styles.button, styles.createButton]} onPress={onCreatePress}>
@@ -28,6 +30,15 @@ export default function ActionButtons({ onCreatePress, onEditPress, onSharePress
         <Text style={styles.buttonText}>Share</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity 
+        style={[styles.button, styles.refreshButton, isRefreshing && styles.refreshingButton]} 
+        onPress={onRefreshPress}
+        disabled={isRefreshing}
+      >
+        <RefreshCw size={16} color="white" style={isRefreshing ? { transform: [{ rotate: '180deg' }] } : {}} />
+        <Text style={styles.buttonText}>Refresh</Text>
+      </TouchableOpacity>
+
       {hasSchedules && (
         <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
           <Download size={16} color="white" />
@@ -42,22 +53,22 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     paddingVertical: 8,
     flexWrap: 'wrap',
-    gap: 4,
+    gap: 3,
   },
   button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: 18,
-    minWidth: 75,
-    gap: 4,
+    minWidth: 70,
+    gap: 3,
     flex: 1,
-    maxWidth: 85,
+    maxWidth: 80,
   },
   createButton: {
     backgroundColor: '#E91E63',
@@ -70,6 +81,13 @@ const styles = StyleSheet.create({
   },
   loadButton: {
     backgroundColor: '#2196F3',
+  },
+  refreshButton: {
+    backgroundColor: '#9C27B0',
+  },
+  refreshingButton: {
+    backgroundColor: '#7B1FA2',
+    opacity: 0.7,
   },
   buttonText: {
     color: 'white',

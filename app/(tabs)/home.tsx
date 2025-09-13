@@ -38,6 +38,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
 
   useEffect(() => {
@@ -91,28 +92,39 @@ export default function HomeScreen() {
     }
   }, [selectedDate, todaySchedule, schedules.length]);
   
-  // Auto-refresh data when component mounts or date changes - optimized
+  // Auto-refresh data when component mounts - optimized
   useEffect(() => {
     const autoRefreshData = async () => {
-      // Only auto-refresh if we don't have a schedule for the current date
-      if (!todaySchedule && schedules.length === 0) {
-        await refreshAllData();
+      console.log('Initial data load - schedules:', schedules.length, 'todaySchedule:', !!todaySchedule);
+      
+      // Only auto-refresh on initial mount if no data is available
+      if (schedules.length === 0) {
+        console.log('No schedules found, refreshing data...');
+        setIsRefreshing(true);
+        try {
+          await refreshAllData();
+        } finally {
+          setIsRefreshing(false);
+        }
       }
     };
     
     // Small delay to let the component settle
-    const timeoutId = setTimeout(autoRefreshData, 100);
+    const timeoutId = setTimeout(autoRefreshData, 200);
     
     return () => clearTimeout(timeoutId);
-  }, [selectedDate]); // Reduced dependencies to prevent excessive re-runs
+  }, []); // Only run on mount
   
   // Auto-load most recent schedule on app startup
   useEffect(() => {
     const autoLoadRecentSchedule = async () => {
+      console.log('Checking for auto-load conditions...');
+      console.log('Today schedule exists:', !!todaySchedule);
+      console.log('Available schedules:', schedules.length);
+      
       // Only auto-load if:
       // 1. There's no schedule for today
       // 2. We have schedules available
-      // 3. This is the initial load (not triggered by date change)
       if (!todaySchedule && schedules.length > 0) {
         console.log('Auto-loading most recent schedule on startup');
         
@@ -123,6 +135,7 @@ export default function HomeScreen() {
         });
         
         const lastSchedule = sortedSchedules[0];
+        console.log('Most recent schedule date:', lastSchedule.date);
         
         // Don't auto-load if the most recent schedule is already for today
         if (lastSchedule.date === selectedDate) {
@@ -142,17 +155,27 @@ export default function HomeScreen() {
           await updateScheduleImmediately(todayScheduleCopy);
           
           console.log(`Auto-loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today`);
+          
+          // Show a brief notification to user
+          Alert.alert(
+            'Schedule Loaded',
+            `Loaded your most recent schedule from ${new Date(lastSchedule.date).toLocaleDateString()}`,
+            [{ text: 'OK' }],
+            { cancelable: true }
+          );
         } catch (error) {
           console.error('Error auto-loading last schedule:', error);
         }
+      } else if (schedules.length === 0) {
+        console.log('No schedules available to auto-load');
       }
     };
     
     // Run auto-load after a short delay to ensure data is loaded
-    const timeoutId = setTimeout(autoLoadRecentSchedule, 500);
+    const timeoutId = setTimeout(autoLoadRecentSchedule, 1000);
     
     return () => clearTimeout(timeoutId);
-  }, [schedules.length]); // Only run when schedules data changes
+  }, [schedules.length, todaySchedule]); // Run when schedules or today's schedule changes
   
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -270,6 +293,27 @@ export default function HomeScreen() {
     router.push('/share-schedule');
   };
 
+  const handleRefreshPress = async () => {
+    console.log('Manual refresh triggered');
+    setIsRefreshing(true);
+    
+    try {
+      const success = await refreshAllData();
+      if (success) {
+        console.log('Manual refresh completed successfully');
+      } else {
+        console.log('Manual refresh completed with issues');
+      }
+    } catch (error) {
+      console.error('Manual refresh failed:', error);
+    } finally {
+      // Add a small delay to show the refresh animation
+      setTimeout(() => {
+        setIsRefreshing(false);
+      }, 500);
+    }
+  };
+
   const handleCategoryPress = (categoryId: string) => {
     if (!todaySchedule) {
       Alert.alert('No Schedule', 'Please create a schedule for today first');
@@ -312,7 +356,9 @@ export default function HomeScreen() {
             onEditPress={handleEditPress}
             onSharePress={handleSharePress}
             onLoadLastPress={loadLastSchedule}
+            onRefreshPress={handleRefreshPress}
             hasSchedules={schedules.length > 0}
+            isRefreshing={isRefreshing}
           />
         </View>
         
@@ -364,8 +410,10 @@ export default function HomeScreen() {
               <View style={styles.noScheduleContainer}>
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
-                {schedules.length > 0 && (
-                  <Text style={styles.loadHintText}>Use &quot;Load Last&quot; button to copy your most recent schedule</Text>
+                {schedules.length > 0 ? (
+                  <Text style={styles.loadHintText}>Use &quot;Load&quot; button to copy your most recent schedule</Text>
+                ) : (
+                  <Text style={styles.loadHintText}>Use &quot;Refresh&quot; button to check for existing schedules</Text>
                 )}
                 
                 {/* Debug info for development */}
