@@ -31,7 +31,7 @@ export default function ActionButtons({ onCreatePress, onEditPress, onSharePress
       {hasSchedules && (
         <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
           <Download size={16} color="white" />
-          <Text style={styles.buttonText}>Load Last</Text>
+          <Text style={styles.buttonText}>Load</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -50,11 +50,11 @@ const styles = StyleSheet.create({
   button: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 18,
     minWidth: 75,
-    justifyContent: 'center',
     gap: 4,
     flex: 1,
     maxWidth: 85,
