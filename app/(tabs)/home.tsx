@@ -106,6 +106,54 @@ export default function HomeScreen() {
     return () => clearTimeout(timeoutId);
   }, [selectedDate]); // Reduced dependencies to prevent excessive re-runs
   
+  // Auto-load most recent schedule on app startup
+  useEffect(() => {
+    const autoLoadRecentSchedule = async () => {
+      // Only auto-load if:
+      // 1. There's no schedule for today
+      // 2. We have schedules available
+      // 3. This is the initial load (not triggered by date change)
+      if (!todaySchedule && schedules.length > 0) {
+        console.log('Auto-loading most recent schedule on startup');
+        
+        // Find the most recently created schedule
+        const sortedSchedules = [...schedules].sort((a, b) => {
+          // Sort by date (most recent first)
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        });
+        
+        const lastSchedule = sortedSchedules[0];
+        
+        // Don't auto-load if the most recent schedule is already for today
+        if (lastSchedule.date === selectedDate) {
+          console.log('Most recent schedule is already for today');
+          return;
+        }
+        
+        // Create a copy of the last schedule for today's date
+        const todayScheduleCopy = {
+          ...lastSchedule,
+          id: `schedule-${selectedDate}`,
+          date: selectedDate
+        };
+        
+        try {
+          // Save the copied schedule for today
+          await updateScheduleImmediately(todayScheduleCopy);
+          
+          console.log(`Auto-loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today`);
+        } catch (error) {
+          console.error('Error auto-loading last schedule:', error);
+        }
+      }
+    };
+    
+    // Run auto-load after a short delay to ensure data is loaded
+    const timeoutId = setTimeout(autoLoadRecentSchedule, 500);
+    
+    return () => clearTimeout(timeoutId);
+  }, [schedules.length]); // Only run when schedules data changes
+  
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
   const currentDate = new Date(year, month - 1, day);
