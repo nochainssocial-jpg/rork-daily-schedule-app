@@ -186,6 +186,11 @@ export default function HomeScreen() {
       </View>
       
       <View style={styles.contentContainer}>
+        <View style={styles.dateContainer}>
+          <Text style={styles.dayText}>{dayName}</Text>
+          <Text style={styles.dateText}>{dateString}</Text>
+        </View>
+        
         <View style={styles.actionButtonsTop}>
           <ActionButtons
             onCreatePress={handleCreatePress}
@@ -206,11 +211,6 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
-        
-        <View style={styles.dateContainer}>
-          <Text style={styles.dayText}>{dayName}</Text>
-          <Text style={styles.dateText}>{dateString}</Text>
-        </View>
 
         {todaySchedule ? (
           <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -321,8 +321,9 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   dateText: {
-    fontSize: 14,
+    fontSize: 17,
     color: '#666',
+    fontWeight: '600' as const,
   },
   categoriesContainer: {
     backgroundColor: '#fff',
