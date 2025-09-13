@@ -1,9 +1,9 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, Share as RNShare, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import type { Staff, Participant, Chore, TimeSlot } from '@/types/schedule';
-import { RefreshCw, AlertCircle } from 'lucide-react-native';
+import { RefreshCw, AlertCircle, Share, FileText } from 'lucide-react-native';
 
 export default function ViewPDFScreen() {
   const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion } = useSchedule();
@@ -14,16 +14,37 @@ export default function ViewPDFScreen() {
   // Force re-render by using a timestamp dependency
   const schedule = getScheduleForDate(selectedDate);
   
+  // Helper functions with useCallback for performance
+  const getStaffName = useCallback((staffId: string) => {
+    const staffMember = staff.find((s: Staff) => s.id === staffId);
+    return staffMember?.name || 'Unknown';
+  }, [staff]);
+
+  const getParticipantName = useCallback((participantId: string) => {
+    const participant = participants.find((p: Participant) => p.id === participantId);
+    return participant?.name || 'Unknown';
+  }, [participants]);
+
+  const getChoreName = useCallback((choreId: string) => {
+    const chore = chores.find((c: Chore) => c.id === choreId);
+    return chore?.name || 'Unknown';
+  }, [chores]);
+
+  const getTimeSlotDisplay = useCallback((timeSlotId: string) => {
+    const slot = timeSlots.find((t: TimeSlot) => t.id === timeSlotId);
+    return slot?.displayTime || 'Unknown';
+  }, [timeSlots]);
+
   // Check if selected date is Saturday
-  const isSaturday = () => {
+  const isSaturday = useCallback(() => {
     // selectedDate is in YYYY-MM-DD format
     const [year, month, day] = selectedDate.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     return date.getDay() === 6;
-  };
+  }, [selectedDate]);
   
   // Group drop-offs by staff
-  const getGroupedDropOffs = () => {
+  const getGroupedDropOffs = useCallback(() => {
     if (!schedule || schedule.dropOffs.length === 0) return [];
     
     const dropOffsByStaff = schedule.dropOffs.reduce((acc, dropOff) => {
@@ -38,10 +59,10 @@ export default function ViewPDFScreen() {
       staffId,
       dropOffs
     }));
-  };
+  }, [schedule]);
   
   // Group pickups by staff
-  const getGroupedPickups = () => {
+  const getGroupedPickups = useCallback(() => {
     if (!schedule || schedule.pickups.length === 0) return [];
     
     const pickupsByStaff = schedule.pickups.reduce((acc, pickup) => {
@@ -56,7 +77,7 @@ export default function ViewPDFScreen() {
       staffId,
       pickups
     }));
-  };
+  }, [schedule]);
   
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -70,6 +91,155 @@ export default function ViewPDFScreen() {
       }
     }, 500);
   }, [hasNewUpdates, markUpdatesAsViewed]);
+
+  const generatePDFText = useCallback(() => {
+    if (!schedule) return '';
+
+    let pdfText = `DAILY SCHEDULE - ${(() => {
+      const [year, month, day] = selectedDate.split('-');
+      return `${day}/${month}/${year}`;
+    })()}\n`;
+    pdfText += `${'='.repeat(50)}\n\n`;
+
+    // Staff Working Today
+    pdfText += `1. STAFF WORKING TODAY\n`;
+    pdfText += `${'-'.repeat(25)}\n`;
+    if (schedule.workingStaff && schedule.workingStaff.length > 0) {
+      schedule.workingStaff.forEach((staffId) => {
+        pdfText += `• ${getStaffName(staffId)}\n`;
+      });
+    } else {
+      pdfText += `No staff assigned\n`;
+    }
+    pdfText += `\n`;
+
+    // Participants Attending Today
+    pdfText += `2. PARTICIPANTS ATTENDING TODAY\n`;
+    pdfText += `${'-'.repeat(32)}\n`;
+    if (schedule.attendingParticipants && schedule.attendingParticipants.length > 0) {
+      schedule.attendingParticipants.forEach((participantId) => {
+        pdfText += `• ${getParticipantName(participantId)}\n`;
+      });
+    } else {
+      pdfText += `No participants assigned\n`;
+    }
+    pdfText += `\n`;
+
+    // Daily Assignment
+    pdfText += `3. DAILY ASSIGNMENT\n`;
+    pdfText += `${'-'.repeat(18)}\n`;
+    schedule.assignments.forEach((assignment) => {
+      pdfText += `${getStaffName(assignment.staffId)}:\n`;
+      assignment.participantIds.forEach(participantId => {
+        pdfText += `  • ${getParticipantName(participantId)}\n`;
+      });
+      pdfText += `\n`;
+    });
+
+    // Front Room - Not shown on Saturdays
+    if (!isSaturday()) {
+      pdfText += `4. FRONT ROOM\n`;
+      pdfText += `${'-'.repeat(12)}\n`;
+      schedule.frontRoomSlots.forEach((slot) => {
+        pdfText += `${getTimeSlotDisplay(slot.timeSlotId)} - ${getStaffName(slot.staffId)}\n`;
+      });
+      pdfText += `\n`;
+
+      // Scotty
+      pdfText += `5. SCOTTY\n`;
+      pdfText += `${'-'.repeat(8)}\n`;
+      schedule.scottySlots.forEach((slot) => {
+        pdfText += `${getTimeSlotDisplay(slot.timeSlotId)} - ${getStaffName(slot.staffId)}\n`;
+      });
+      pdfText += `\n`;
+
+      // Twins
+      pdfText += `6. TWINS\n`;
+      pdfText += `${'-'.repeat(7)}\n`;
+      schedule.twinsSlots.forEach((slot) => {
+        pdfText += `${getTimeSlotDisplay(slot.timeSlotId)} - ${getStaffName(slot.staffId)}\n`;
+      });
+      pdfText += `\n`;
+    }
+
+    // Chores
+    pdfText += `${isSaturday() ? '4' : '7'}. CHORES\n`;
+    pdfText += `${'-'.repeat(8)}\n`;
+    schedule.choreAssignments.forEach((assignment) => {
+      pdfText += `${getChoreName(assignment.choreId)} - ${getStaffName(assignment.staffId)}\n`;
+    });
+    pdfText += `\n`;
+
+    // Drop-offs
+    pdfText += `${isSaturday() ? '5' : '8'}. DROP-OFFS\n`;
+    pdfText += `${'-'.repeat(11)}\n`;
+    const groupedDropOffs = getGroupedDropOffs();
+    if (groupedDropOffs.length > 0) {
+      groupedDropOffs.forEach((group) => {
+        pdfText += `${getStaffName(group.staffId)}:\n`;
+        pdfText += `  ${group.dropOffs.map(d => getParticipantName(d.participantId)).join(', ')}\n`;
+      });
+    } else {
+      pdfText += `No drop-offs scheduled\n`;
+    }
+    pdfText += `\n`;
+
+    // Pickups
+    pdfText += `${isSaturday() ? '6' : '9'}. PICKUPS\n`;
+    pdfText += `${'-'.repeat(9)}\n`;
+    const groupedPickups = getGroupedPickups();
+    if (groupedPickups.length > 0) {
+      groupedPickups.forEach((group) => {
+        pdfText += `${getStaffName(group.staffId)}:\n`;
+        pdfText += `  ${group.pickups.map(p => getParticipantName(p.participantId)).join(', ')}\n`;
+      });
+    } else {
+      pdfText += `No pickups scheduled\n`;
+    }
+    pdfText += `\n`;
+
+    // Final Checklist
+    pdfText += `${isSaturday() ? '7' : '10'}. FINAL CHECKLIST\n`;
+    pdfText += `${'-'.repeat(16)}\n`;
+    pdfText += `Assigned to: ${getStaffName(schedule.finalChecklistStaff)}\n`;
+    pdfText += `\n`;
+
+    pdfText += `${'='.repeat(50)}\n`;
+    pdfText += `Generated on: ${new Date().toLocaleString()}\n`;
+    pdfText += `App Version: ${appVersion}\n`;
+
+    return pdfText;
+  }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, getGroupedDropOffs, getGroupedPickups]);
+
+  const sharePDF = useCallback(async () => {
+    if (!schedule) {
+      console.log('No schedule available to share');
+      return;
+    }
+
+    const pdfText = generatePDFText();
+    
+    try {
+      await RNShare.share({
+        message: pdfText,
+        title: `Daily Schedule - ${(() => {
+          const [year, month, day] = selectedDate.split('-');
+          return `${day}/${month}/${year}`;
+        })()}`
+      });
+    } catch (error) {
+      console.log('Error sharing PDF:', error);
+      // Fallback to clipboard for web
+      if (Platform.OS === 'web' && navigator.clipboard) {
+        try {
+          await navigator.clipboard.writeText(pdfText);
+          console.log('Schedule PDF content copied to clipboard');
+        } catch (clipboardError) {
+          console.log('Clipboard error:', clipboardError);
+        }
+      }
+    }
+  }, [schedule, generatePDFText, selectedDate]);
 
   // Auto-refresh when critical updates are detected
   useEffect(() => {
@@ -107,26 +277,6 @@ export default function ViewPDFScreen() {
     dropOffs: '#A8DADC',
     pickups: '#B19CD9',
     finalChecklist: '#E56B6F',
-  };
-
-  const getStaffName = (staffId: string) => {
-    const staffMember = staff.find((s: Staff) => s.id === staffId);
-    return staffMember?.name || 'Unknown';
-  };
-
-  const getParticipantName = (participantId: string) => {
-    const participant = participants.find((p: Participant) => p.id === participantId);
-    return participant?.name || 'Unknown';
-  };
-
-  const getChoreName = (choreId: string) => {
-    const chore = chores.find((c: Chore) => c.id === choreId);
-    return chore?.name || 'Unknown';
-  };
-
-  const getTimeSlotDisplay = (timeSlotId: string) => {
-    const slot = timeSlots.find((t: TimeSlot) => t.id === timeSlotId);
-    return slot?.displayTime || 'Unknown';
   };
 
   if (!schedule) {
@@ -187,7 +337,16 @@ export default function ViewPDFScreen() {
             <Text style={styles.updateBadge}>New updates available!</Text>
           )}
         </View>
-        <Text style={styles.versionText}>Version {appVersion}</Text>
+        <View style={styles.actionRow}>
+          <Text style={styles.versionText}>Version {appVersion}</Text>
+          <TouchableOpacity 
+            style={styles.sharePDFButton} 
+            onPress={sharePDF}
+          >
+            <FileText size={16} color="white" />
+            <Text style={styles.sharePDFText}>Share PDF</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Staff Working Today */}
@@ -392,6 +551,26 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#AAA',
     marginTop: 4,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  sharePDFButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+  },
+  sharePDFText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '600',
   },
   lastUpdated: {
     fontSize: 12,
