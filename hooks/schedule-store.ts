@@ -441,6 +441,37 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     }
   };
 
+  // Refresh all data function
+  const refreshAllData = async () => {
+    console.log('Refreshing all data from AsyncStorage...');
+    
+    // Invalidate all queries to force fresh data fetch from AsyncStorage
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['staff'] }),
+      queryClient.invalidateQueries({ queryKey: ['participants'] }),
+      queryClient.invalidateQueries({ queryKey: ['chores'] }),
+      queryClient.invalidateQueries({ queryKey: ['checklist'] }),
+      queryClient.invalidateQueries({ queryKey: ['schedules'] })
+    ]);
+    
+    // Reload category updates for current date
+    try {
+      const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
+      if (updates) {
+        setCategoryUpdates(JSON.parse(updates));
+        console.log('Category updates reloaded:', JSON.parse(updates));
+      } else {
+        setCategoryUpdates([]);
+        console.log('No category updates found for date:', selectedDate);
+      }
+    } catch (error) {
+      console.error('Error reloading category updates:', error);
+      setCategoryUpdates([]);
+    }
+    
+    console.log('Data refresh completed');
+  };
+
   return {
     // Data
     staff: staffQuery.data || [],
@@ -470,6 +501,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     getScheduleForDate,
     updateCategory,
     markUpdatesAsViewed,
+    refreshAllData,
     
     // Save functions
     saveStaff: saveStaffMutation.mutate,

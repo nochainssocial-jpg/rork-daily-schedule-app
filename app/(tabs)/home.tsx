@@ -34,7 +34,8 @@ export default function HomeScreen() {
     setSelectedDate, 
     setScheduleStep,
     getScheduleForDate,
-    categoryUpdates
+    categoryUpdates,
+    refreshAllData
   } = useSchedule();
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
@@ -186,15 +187,11 @@ export default function HomeScreen() {
     ).start();
     
     try {
-      // Force reload schedule data by updating the selected date
-      // This will trigger the useEffect in schedule-store to reload category updates
-      const currentDate = selectedDate;
-      setSelectedDate('');
+      // Force reload all data from AsyncStorage by calling the refresh function from schedule store
+      await refreshAllData();
       
-      // Small delay to ensure state change is processed
+      // Small delay for user feedback
       setTimeout(() => {
-        setSelectedDate(currentDate);
-        
         // Reset animations
         Animated.parallel([
           Animated.timing(pullDistance, {
@@ -215,7 +212,7 @@ export default function HomeScreen() {
         ]).start();
         
         setRefreshing(false);
-      }, 1000);
+      }, 800);
     } catch (error) {
       console.error('Error refreshing data:', error);
       setRefreshing(false);
