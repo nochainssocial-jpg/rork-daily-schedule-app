@@ -96,7 +96,7 @@ export default function HomeScreen() {
 
   const todaySchedule = getScheduleForDate(selectedDate);
   
-  // Debug logging
+  // Enhanced debug logging with automatic data loading
   useEffect(() => {
     console.log('=== HOME SCREEN DEBUG ===');
     console.log('Selected date:', selectedDate);
@@ -111,15 +111,38 @@ export default function HomeScreen() {
         workingStaff: todaySchedule.workingStaff.length,
         participants: todaySchedule.attendingParticipants.length
       });
+    } else {
+      console.log('No schedule found for today. Checking if data needs to be loaded...');
+      
+      // If no schedule is found but we have schedules in general, log available dates
+      if (schedules.length > 0) {
+        console.log('Available schedule dates:', schedules.map((s: any) => ({ date: s.date, id: s.id })));
+        console.log('Date mismatch - looking for:', selectedDate);
+      } else {
+        console.log('No schedules available in state - may need to refresh data');
+      }
     }
     
-    if (schedules.length > 0) {
-      console.log('Available schedule dates:', schedules.map((s: any) => ({ date: s.date, id: s.id })));
-    } else {
-      console.log('No schedules available in state');
-    }
     console.log('========================');
   }, [selectedDate, todaySchedule, schedules, forceUpdate]);
+  
+  // Auto-refresh data when component mounts or date changes
+  useEffect(() => {
+    const autoRefreshData = async () => {
+      // Only auto-refresh if we don't have a schedule for the current date
+      // and we're not already refreshing
+      if (!todaySchedule && !refreshing && schedules.length === 0) {
+        console.log('Auto-refreshing data on mount/date change...');
+        await refreshAllData();
+        setForceUpdate(prev => prev + 1);
+      }
+    };
+    
+    // Small delay to let the component settle
+    const timeoutId = setTimeout(autoRefreshData, 100);
+    
+    return () => clearTimeout(timeoutId);
+  }, [selectedDate]); // Only depend on selectedDate to avoid infinite loops
   
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -202,7 +225,7 @@ export default function HomeScreen() {
   });
 
   const onRefresh = async () => {
-    console.log('Pull to refresh triggered');
+    console.log('=== PULL TO REFRESH TRIGGERED ===');
     setRefreshing(true);
     
     // Animate refresh icon rotation
@@ -216,25 +239,38 @@ export default function HomeScreen() {
     rotationAnimation.start();
     
     try {
-      console.log('Starting data refresh...');
+      console.log('Starting comprehensive data refresh...');
       console.log('Current selected date:', selectedDate);
       console.log('Current schedules before refresh:', schedules.length);
       
-      // Force reload all data from AsyncStorage
+      // Force reload all data from AsyncStorage with improved reliability
       const refreshSuccess = await refreshAllData();
       
       if (refreshSuccess) {
         console.log('Data refresh completed successfully');
         
-        // Force component re-render to pick up fresh data
+        // Force multiple re-renders to ensure data propagation
         setForceUpdate(prev => prev + 1);
         
-        // Wait for React Query to propagate changes
-        await new Promise(resolve => setTimeout(resolve, 300));
+        // Wait longer for React Query to fully propagate changes
+        await new Promise(resolve => setTimeout(resolve, 500));
         
-        // Check if schedule data is now available
-        const refreshedSchedule = getScheduleForDate(selectedDate);
-        console.log('Schedule after refresh:', refreshedSchedule ? 'Found' : 'Not found');
+        // Force another update to ensure UI reflects the latest data
+        setForceUpdate(prev => prev + 1);
+        
+        // Check if schedule data is now available with retry logic
+        let refreshedSchedule = getScheduleForDate(selectedDate);
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        while (!refreshedSchedule && retryCount < maxRetries) {
+          console.log(`Retry ${retryCount + 1}: Waiting for schedule data to load...`);
+          await new Promise(resolve => setTimeout(resolve, 200));
+          refreshedSchedule = getScheduleForDate(selectedDate);
+          retryCount++;
+        }
+        
+        console.log('Schedule after refresh:', refreshedSchedule ? 'FOUND' : 'NOT FOUND');
         console.log('Total schedules available after refresh:', schedules.length);
         
         if (refreshedSchedule) {
@@ -244,6 +280,30 @@ export default function HomeScreen() {
             workingStaff: refreshedSchedule.workingStaff.length,
             participants: refreshedSchedule.attendingParticipants.length
           });
+        } else {
+          console.log('Schedule still not found after retries. Checking AsyncStorage directly...');
+          
+          // Direct AsyncStorage check as fallback
+          try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const storedSchedules = await AsyncStorage.getItem('schedules');
+            if (storedSchedules) {
+              const parsedSchedules = JSON.parse(storedSchedules);
+              const directSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
+              console.log('Direct AsyncStorage check - Schedule found:', directSchedule ? 'YES' : 'NO');
+              
+              if (directSchedule) {
+                console.log('Schedule exists in AsyncStorage but not in React Query state');
+                console.log('This indicates a React Query synchronization issue');
+                
+                // Force one more refresh cycle
+                await refreshAllData();
+                setForceUpdate(prev => prev + 1);
+              }
+            }
+          } catch (directCheckError) {
+            console.error('Error in direct AsyncStorage check:', directCheckError);
+          }
         }
       } else {
         console.log('Data refresh failed');
@@ -273,8 +333,8 @@ export default function HomeScreen() {
         ]).start();
         
         setRefreshing(false);
-        console.log('Refresh animation completed');
-      }, 600);
+        console.log('=== REFRESH CYCLE COMPLETED ===');
+      }, 800);
     } catch (error) {
       console.error('Error refreshing data:', error);
       
@@ -301,6 +361,7 @@ export default function HomeScreen() {
       ]).start();
       
       setRefreshing(false);
+      console.log('=== REFRESH FAILED ===');
     }
   };
 
@@ -479,7 +540,22 @@ export default function HomeScreen() {
               <View style={styles.noScheduleContainer}>
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
-                <Text style={styles.refreshHintText}>Pull down to refresh</Text>
+                <Text style={styles.refreshHintText}>Pull down to refresh and reload data</Text>
+                
+                {/* Debug info for development */}
+                {__DEV__ && (
+                  <View style={styles.debugContainer}>
+                    <Text style={styles.debugText}>Debug Info:</Text>
+                    <Text style={styles.debugText}>Date: {selectedDate}</Text>
+                    <Text style={styles.debugText}>Total Schedules: {schedules.length}</Text>
+                    <Text style={styles.debugText}>Force Update: {forceUpdate}</Text>
+                    {schedules.length > 0 && (
+                      <Text style={styles.debugText}>
+                        Available: {schedules.map((s: any) => s.date).join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                )}
               </View>
             </ScrollView>
           )}
@@ -619,6 +695,18 @@ const styles = StyleSheet.create({
     textAlign: 'center' as const,
     marginTop: 8,
     fontStyle: 'italic' as const,
+  },
+  debugContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  debugText: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center' as const,
+    marginBottom: 2,
   },
   scrollContainer: {
     flex: 1,

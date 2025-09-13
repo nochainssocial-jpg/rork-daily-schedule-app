@@ -1,7 +1,7 @@
 import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Staff, Participant, Chore, ChecklistItem, Schedule, Assignment, TimeSlotAssignment, ChoreAssignment, DropOffAssignment, PickupAssignment } from '@/types/schedule';
 import { DEFAULT_STAFF, DEFAULT_PARTICIPANTS, DEFAULT_CHORES, DEFAULT_CHECKLIST, TIME_SLOTS } from '@/constants/data';
 
@@ -60,11 +60,11 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   }, [selectedDate]);
 
   // Mark updates as viewed
-  const markUpdatesAsViewed = async () => {
+  const markUpdatesAsViewed = useCallback(async () => {
     await AsyncStorage.setItem('lastViewedVersion', APP_VERSION);
     setLastViewedVersion(APP_VERSION);
     setHasNewUpdates(false);
-  };
+  }, []);
 
   // Update selected date when day changes
   useEffect(() => {
@@ -213,6 +213,13 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
 
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: Schedule) => {
+      console.log('Saving schedule to AsyncStorage:', {
+        id: schedule.id,
+        date: schedule.date,
+        workingStaff: schedule.workingStaff.length,
+        participants: schedule.attendingParticipants.length
+      });
+      
       const schedules = schedulesQuery.data || [];
       const existingIndex = schedules.findIndex((s: Schedule) => s.date === schedule.date);
       
@@ -220,29 +227,63 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       
       if (existingIndex >= 0) {
         schedules[existingIndex] = schedule;
+        console.log('Updated existing schedule at index:', existingIndex);
       } else {
         schedules.push(schedule);
+        console.log('Added new schedule, total schedules:', schedules.length);
       }
       
-      await AsyncStorage.setItem('schedules', JSON.stringify(schedules));
+      // Save to AsyncStorage with error handling
+      try {
+        await AsyncStorage.setItem('schedules', JSON.stringify(schedules));
+        console.log('Successfully saved schedules to AsyncStorage');
+        
+        // Verify the save by reading it back
+        const savedData = await AsyncStorage.getItem('schedules');
+        if (savedData) {
+          const parsedData = JSON.parse(savedData);
+          console.log('Verified saved schedules count:', parsedData.length);
+          const savedSchedule = parsedData.find((s: any) => s.date === schedule.date);
+          console.log('Verified schedule for date exists:', savedSchedule ? 'YES' : 'NO');
+        }
+      } catch (error) {
+        console.error('Error saving schedule to AsyncStorage:', error);
+        throw error;
+      }
       
-      // Track schedule creation
-      if (isNew) {
-        const update: CategoryUpdate = {
-          category: 'schedule',
-          timestamp: new Date().toISOString(),
-          action: 'created'
-        };
-        const updates = [update];
-        await AsyncStorage.setItem(`categoryUpdates_${schedule.date}`, JSON.stringify(updates));
-        setCategoryUpdates(updates);
+      // Track schedule creation/update
+      const update: CategoryUpdate = {
+        category: 'schedule',
+        timestamp: new Date().toISOString(),
+        action: isNew ? 'created' : 'updated'
+      };
+      
+      try {
+        const existingUpdates = await AsyncStorage.getItem(`categoryUpdates_${schedule.date}`);
+        const updates = existingUpdates ? JSON.parse(existingUpdates) : [];
+        
+        // Remove any previous schedule update and add the new one
+        const filteredUpdates = updates.filter((u: CategoryUpdate) => u.category !== 'schedule');
+        filteredUpdates.push(update);
+        
+        await AsyncStorage.setItem(`categoryUpdates_${schedule.date}`, JSON.stringify(filteredUpdates));
+        setCategoryUpdates(filteredUpdates);
+        console.log('Updated category updates for date:', schedule.date);
+      } catch (error) {
+        console.error('Error saving category updates:', error);
       }
       
       return schedules;
     },
-    onSuccess: async () => {
-      queryClient.invalidateQueries({ queryKey: ['schedules'] });
+    onSuccess: async (schedules) => {
+      console.log('Schedule save mutation successful, invalidating queries...');
+      await queryClient.invalidateQueries({ queryKey: ['schedules'] });
+      await queryClient.refetchQueries({ queryKey: ['schedules'] });
       await trackCriticalUpdate('schedule_saved');
+      console.log('Queries invalidated and refetched');
+    },
+    onError: (error) => {
+      console.error('Schedule save mutation failed:', error);
     }
   });
 
@@ -342,6 +383,10 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     assignments: Assignment[],
     finalChecklistStaff: string
   ) => {
+    console.log('Creating new schedule for date:', selectedDate);
+    console.log('Working staff:', workingStaff.length);
+    console.log('Attending participants:', attendingParticipants.length);
+    
     const timeSlotAssignments = generateTimeSlotAssignments(workingStaff);
     const choreAssignments = generateChoreAssignments(workingStaff);
 
@@ -360,6 +405,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       pickups: [] as PickupAssignment[]
     };
 
+    console.log('Schedule created with ID:', schedule.id);
     setCurrentSchedule(schedule);
     saveScheduleMutation.mutate(schedule);
   };
@@ -370,25 +416,35 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   }, [schedulesQuery.data]);
   
   const updateCategory = async (category: string, schedule: Schedule) => {
-    // Save the schedule
-    await saveScheduleMutation.mutateAsync(schedule);
+    console.log('Updating category:', category, 'for date:', schedule.date);
     
-    // Track category update
-    const update: CategoryUpdate = {
-      category,
-      timestamp: new Date().toISOString(),
-      action: 'updated'
-    };
-    
-    const existingUpdates = await AsyncStorage.getItem(`categoryUpdates_${schedule.date}`);
-    const updates = existingUpdates ? JSON.parse(existingUpdates) : [];
-    
-    // Remove any previous update for the same category and add the new one
-    const filteredUpdates = updates.filter((u: CategoryUpdate) => u.category !== category);
-    filteredUpdates.push(update);
-    
-    await AsyncStorage.setItem(`categoryUpdates_${schedule.date}`, JSON.stringify(filteredUpdates));
-    setCategoryUpdates(filteredUpdates);
+    try {
+      // Save the schedule with improved error handling
+      await saveScheduleMutation.mutateAsync(schedule);
+      console.log('Schedule saved successfully for category update:', category);
+      
+      // Track category update
+      const update: CategoryUpdate = {
+        category,
+        timestamp: new Date().toISOString(),
+        action: 'updated'
+      };
+      
+      const existingUpdates = await AsyncStorage.getItem(`categoryUpdates_${schedule.date}`);
+      const updates = existingUpdates ? JSON.parse(existingUpdates) : [];
+      
+      // Remove any previous update for the same category and add the new one
+      const filteredUpdates = updates.filter((u: CategoryUpdate) => u.category !== category);
+      filteredUpdates.push(update);
+      
+      await AsyncStorage.setItem(`categoryUpdates_${schedule.date}`, JSON.stringify(filteredUpdates));
+      setCategoryUpdates(filteredUpdates);
+      
+      console.log('Category update tracked successfully:', category);
+    } catch (error) {
+      console.error('Error updating category:', category, error);
+      throw error;
+    }
   };
 
   // Regenerate assignments with updated staff
@@ -441,67 +497,114 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     }
   };
 
-  // Refresh all data function
+  // Refresh all data function with improved reliability
   const refreshAllData = async () => {
-    console.log('Refreshing all data from AsyncStorage...');
+    console.log('=== STARTING DATA REFRESH ===');
+    console.log('Current selected date:', selectedDate);
     
     try {
-      // Invalidate and refetch all queries to get fresh data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['staff'] }),
-        queryClient.invalidateQueries({ queryKey: ['participants'] }),
-        queryClient.invalidateQueries({ queryKey: ['chores'] }),
-        queryClient.invalidateQueries({ queryKey: ['checklist'] }),
-        queryClient.invalidateQueries({ queryKey: ['schedules'] })
-      ]);
+      // First, clear all query cache to force fresh data load
+      console.log('Clearing query cache...');
+      queryClient.clear();
       
-      // Wait for queries to refetch
-      await Promise.all([
-        queryClient.refetchQueries({ queryKey: ['staff'] }),
-        queryClient.refetchQueries({ queryKey: ['participants'] }),
-        queryClient.refetchQueries({ queryKey: ['chores'] }),
-        queryClient.refetchQueries({ queryKey: ['checklist'] }),
-        queryClient.refetchQueries({ queryKey: ['schedules'] })
-      ]);
+      // Wait a moment for cache to clear
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Force refetch all queries with fresh data from AsyncStorage
+      console.log('Refetching all queries...');
+      const refreshPromises = [
+        queryClient.refetchQueries({ queryKey: ['staff'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['participants'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['chores'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['checklist'], type: 'active' }),
+        queryClient.refetchQueries({ queryKey: ['schedules'], type: 'active' })
+      ];
+      
+      await Promise.all(refreshPromises);
+      console.log('All queries refetched successfully');
+      
+      // Wait for React Query to propagate the changes
+      await new Promise(resolve => setTimeout(resolve, 200));
       
       // Reload category updates for current date
-      const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
-      if (updates) {
-        setCategoryUpdates(JSON.parse(updates));
-        console.log('Category updates reloaded:', JSON.parse(updates));
-      } else {
-        setCategoryUpdates([]);
-        console.log('No category updates found for date:', selectedDate);
-      }
-      
-      // Log all available schedules after refresh
-      const allSchedules = await AsyncStorage.getItem('schedules');
-      if (allSchedules) {
-        const parsedSchedules = JSON.parse(allSchedules);
-        console.log('All schedules in AsyncStorage after refresh:', parsedSchedules.map((s: any) => ({ date: s.date, id: s.id })));
-        console.log('Looking for schedule with date:', selectedDate);
-        const foundSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
-        console.log('Found schedule for current date:', foundSchedule ? 'YES' : 'NO');
-        
-        if (foundSchedule) {
-          console.log('Schedule details:', {
-            id: foundSchedule.id,
-            workingStaff: foundSchedule.workingStaff?.length || 0,
-            participants: foundSchedule.attendingParticipants?.length || 0
-          });
+      console.log('Reloading category updates for date:', selectedDate);
+      try {
+        const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
+        if (updates) {
+          const parsedUpdates = JSON.parse(updates);
+          setCategoryUpdates(parsedUpdates);
+          console.log('Category updates reloaded:', parsedUpdates.length, 'updates');
+        } else {
+          setCategoryUpdates([]);
+          console.log('No category updates found for date:', selectedDate);
         }
-      } else {
-        console.log('No schedules found in AsyncStorage');
+      } catch (updateError) {
+        console.error('Error loading category updates:', updateError);
+        setCategoryUpdates([]);
       }
       
-      console.log('Data refresh completed successfully');
+      // Verify data integrity by checking AsyncStorage directly
+      console.log('Verifying data integrity...');
+      try {
+        const allSchedules = await AsyncStorage.getItem('schedules');
+        if (allSchedules) {
+          const parsedSchedules = JSON.parse(allSchedules);
+          console.log('Total schedules in AsyncStorage:', parsedSchedules.length);
+          console.log('Available schedule dates:', parsedSchedules.map((s: any) => s.date));
+          
+          const foundSchedule = parsedSchedules.find((s: any) => s.date === selectedDate);
+          console.log('Schedule for current date (' + selectedDate + '):', foundSchedule ? 'FOUND' : 'NOT FOUND');
+          
+          if (foundSchedule) {
+            console.log('Schedule details:', {
+              id: foundSchedule.id,
+              workingStaff: foundSchedule.workingStaff?.length || 0,
+              participants: foundSchedule.attendingParticipants?.length || 0,
+              hasAssignments: foundSchedule.assignments?.length || 0,
+              hasFrontRoomSlots: foundSchedule.frontRoomSlots?.length || 0,
+              hasChoreAssignments: foundSchedule.choreAssignments?.length || 0
+            });
+          }
+        } else {
+          console.log('No schedules found in AsyncStorage');
+        }
+      } catch (verifyError) {
+        console.error('Error verifying data integrity:', verifyError);
+      }
+      
+      console.log('=== DATA REFRESH COMPLETED SUCCESSFULLY ===');
       return true;
     } catch (error) {
-      console.error('Error during data refresh:', error);
+      console.error('=== DATA REFRESH FAILED ===', error);
       setCategoryUpdates([]);
       return false;
     }
   };
+
+  // Auto-save function for immediate persistence
+  const autoSaveSchedule = useCallback(async (schedule: Schedule) => {
+    console.log('Auto-saving schedule:', schedule.id);
+    try {
+      await saveScheduleMutation.mutateAsync(schedule);
+      console.log('Schedule auto-saved successfully');
+    } catch (error) {
+      console.error('Error auto-saving schedule:', error);
+    }
+  }, [saveScheduleMutation]);
+  
+  // Enhanced schedule update function with immediate persistence
+  const updateScheduleImmediately = useCallback(async (updatedSchedule: Schedule) => {
+    console.log('Updating schedule immediately:', updatedSchedule.id);
+    
+    // Update local state first for immediate UI feedback
+    setCurrentSchedule(updatedSchedule);
+    
+    // Then persist to AsyncStorage
+    await autoSaveSchedule(updatedSchedule);
+    
+    // Force UI refresh
+    await refreshAllData();
+  }, [autoSaveSchedule, refreshAllData]);
 
   return {
     // Data
@@ -533,6 +636,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     updateCategory,
     markUpdatesAsViewed,
     refreshAllData,
+    autoSaveSchedule,
+    updateScheduleImmediately,
     
     // Save functions
     saveStaff: saveStaffMutation.mutate,
