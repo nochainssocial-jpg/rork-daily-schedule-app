@@ -2,7 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Staff, Participant, Chore, ChecklistItem, Schedule, Assignment, TimeSlotAssignment, ChoreAssignment, DropOffAssignment, PickupAssignment } from '@/types/schedule';
+import { Staff, Participant, Chore, ChecklistItem, Schedule, Assignment, TimeSlotAssignment, ChoreAssignment, DropOffAssignment, PickupAssignment, SharedSchedule, ScheduleImportResult } from '@/types/schedule';
 import { DEFAULT_STAFF, DEFAULT_PARTICIPANTS, DEFAULT_CHORES, DEFAULT_CHECKLIST, TIME_SLOTS } from '@/constants/data';
 
 // App version tracking for critical updates
@@ -606,6 +606,122 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     await refreshAllData();
   }, [autoSaveSchedule, refreshAllData]);
 
+  // Generate 6-digit sharing code
+  const generateSharingCode = (): string => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  // Share schedule with 6-digit code
+  const shareScheduleWithCode = useCallback(async (schedule: Schedule): Promise<string> => {
+    console.log('Generating sharing code for schedule:', schedule.id);
+    
+    const code = generateSharingCode();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+    
+    const sharedSchedule: SharedSchedule = {
+      code,
+      schedule,
+      createdAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString()
+    };
+    
+    try {
+      // Store the shared schedule with the code as key
+      await AsyncStorage.setItem(`shared_${code}`, JSON.stringify(sharedSchedule));
+      
+      // Also maintain a list of active codes for cleanup
+      const activeCodes = await AsyncStorage.getItem('active_sharing_codes');
+      const codes = activeCodes ? JSON.parse(activeCodes) : [];
+      codes.push({ code, expiresAt: expiresAt.toISOString() });
+      await AsyncStorage.setItem('active_sharing_codes', JSON.stringify(codes));
+      
+      console.log('Schedule shared with code:', code);
+      return code;
+    } catch (error) {
+      console.error('Error sharing schedule:', error);
+      throw new Error('Failed to generate sharing code');
+    }
+  }, []);
+
+  // Import schedule using 6-digit code
+  const importScheduleWithCode = useCallback(async (code: string): Promise<ScheduleImportResult> => {
+    console.log('Importing schedule with code:', code);
+    
+    if (!/^\d{6}$/.test(code)) {
+      return { success: false, error: 'Invalid code format. Please enter a 6-digit code.' };
+    }
+    
+    try {
+      const sharedData = await AsyncStorage.getItem(`shared_${code}`);
+      
+      if (!sharedData) {
+        return { success: false, error: 'Code not found. Please check the code and try again.' };
+      }
+      
+      const sharedSchedule: SharedSchedule = JSON.parse(sharedData);
+      
+      // Check if code has expired
+      const now = new Date();
+      const expiresAt = new Date(sharedSchedule.expiresAt);
+      
+      if (now > expiresAt) {
+        // Clean up expired code
+        await AsyncStorage.removeItem(`shared_${code}`);
+        return { success: false, error: 'This code has expired. Please request a new code.' };
+      }
+      
+      // Import the schedule
+      const importedSchedule = {
+        ...sharedSchedule.schedule,
+        id: `schedule-${selectedDate}`, // Use current date for imported schedule
+        date: selectedDate
+      };
+      
+      // Save the imported schedule
+      await saveScheduleMutation.mutateAsync(importedSchedule);
+      setCurrentSchedule(importedSchedule);
+      
+      console.log('Schedule imported successfully');
+      return { success: true, schedule: importedSchedule };
+    } catch (error) {
+      console.error('Error importing schedule:', error);
+      return { success: false, error: 'Failed to import schedule. Please try again.' };
+    }
+  }, [selectedDate, saveScheduleMutation]);
+
+  // Clean up expired sharing codes
+  const cleanupExpiredCodes = useCallback(async () => {
+    try {
+      const activeCodes = await AsyncStorage.getItem('active_sharing_codes');
+      if (!activeCodes) return;
+      
+      const codes = JSON.parse(activeCodes);
+      const now = new Date();
+      const validCodes = [];
+      
+      for (const codeInfo of codes) {
+        const expiresAt = new Date(codeInfo.expiresAt);
+        if (now <= expiresAt) {
+          validCodes.push(codeInfo);
+        } else {
+          // Remove expired shared schedule
+          await AsyncStorage.removeItem(`shared_${codeInfo.code}`);
+        }
+      }
+      
+      await AsyncStorage.setItem('active_sharing_codes', JSON.stringify(validCodes));
+      console.log('Cleaned up expired sharing codes');
+    } catch (error) {
+      console.error('Error cleaning up expired codes:', error);
+    }
+  }, []);
+
+  // Run cleanup on app start
+  useEffect(() => {
+    cleanupExpiredCodes();
+  }, [cleanupExpiredCodes]);
+
   return {
     // Data
     staff: staffQuery.data || [],
@@ -645,6 +761,11 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     saveChores: saveChoresMutation.mutate,
     saveChecklist: saveChecklistMutation.mutate,
     regenerateAssignments,
-    updateWorkingStaffWithNewStaff
+    updateWorkingStaffWithNewStaff,
+    
+    // Sharing functions
+    shareScheduleWithCode,
+    importScheduleWithCode,
+    cleanupExpiredCodes
   };
 });

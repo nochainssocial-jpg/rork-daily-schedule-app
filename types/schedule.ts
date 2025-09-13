@@ -76,3 +76,16 @@ export interface ScheduleStep {
   title: string;
   completed: boolean;
 }
+
+export interface SharedSchedule {
+  code: string;
+  schedule: Schedule;
+  createdAt: string;
+  expiresAt: string;
+}
+
+export interface ScheduleImportResult {
+  success: boolean;
+  schedule?: Schedule;
+  error?: string;
+}

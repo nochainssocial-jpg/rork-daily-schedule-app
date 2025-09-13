@@ -1,13 +1,18 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, Share as RNShare } from 'react-native';
-import { Share, Users } from 'lucide-react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, Share as RNShare, TextInput, ActivityIndicator } from 'react-native';
+import { Share, Users, Hash, Download, Copy } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 
 export default function ShareScreen() {
-  const { selectedDate, getScheduleForDate, staff } = useSchedule();
+  const { selectedDate, getScheduleForDate, staff, shareScheduleWithCode, importScheduleWithCode } = useSchedule();
   const insets = useSafeAreaInsets();
   const schedule = getScheduleForDate(selectedDate);
+  
+  const [generatedCode, setGeneratedCode] = useState<string>('');
+  const [importCode, setImportCode] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isImporting, setIsImporting] = useState<boolean>(false);
 
   const shareSchedule = async () => {
     if (!schedule) {
@@ -57,17 +62,7 @@ export default function ShareScreen() {
     return text;
   };
 
-  if (!schedule) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.emptyState}>
-          <Share size={48} color="#CCC" />
-          <Text style={styles.emptyTitle}>No Schedule to Share</Text>
-          <Text style={styles.emptyText}>Create a schedule first to share it with others.</Text>
-        </View>
-      </View>
-    );
-  }
+
 
   const shareApp = async () => {
     let appUrl = '';
@@ -173,11 +168,155 @@ export default function ShareScreen() {
     }
   };
 
+  const generateCode = async () => {
+    if (!schedule) {
+      Alert.alert('No Schedule', 'No schedule found for the selected date.');
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const code = await shareScheduleWithCode(schedule);
+      setGeneratedCode(code);
+      Alert.alert(
+        'Code Generated! 🎉',
+        `Your 6-digit sharing code is: ${code}\n\nThis code will expire in 24 hours. Share it with colleagues to import your schedule.`,
+        [
+          { text: 'Copy Code', onPress: () => copyCodeToClipboard(code) },
+          { text: 'OK' }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate sharing code. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const copyCodeToClipboard = async (code: string) => {
+    if (Platform.OS === 'web' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(code);
+        Alert.alert('Copied!', 'Code copied to clipboard');
+      } catch (error) {
+        console.log('Clipboard error:', error);
+      }
+    } else {
+      Alert.alert('Code', `Your sharing code: ${code}`);
+    }
+  };
+
+  const importSchedule = async () => {
+    if (!importCode.trim()) {
+      Alert.alert('Invalid Code', 'Please enter a 6-digit code.');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const result = await importScheduleWithCode(importCode.trim());
+      
+      if (result.success) {
+        Alert.alert(
+          'Success! 🎉',
+          'Schedule imported successfully! The schedule has been loaded for today.',
+          [{ text: 'OK', onPress: () => setImportCode('') }]
+        );
+      } else {
+        Alert.alert('Import Failed', result.error || 'Failed to import schedule.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to import schedule. Please try again.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Share & Collaborate</Text>
-        <Text style={styles.subtitle}>Share the app or today&apos;s schedule</Text>
+        <Text style={styles.subtitle}>Share schedules with 6-digit codes</Text>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
+        <Text style={styles.date}>{selectedDate}</Text>
+        
+        {schedule ? (
+          <>
+            <TouchableOpacity 
+              style={[styles.codeButton, styles.generateButton]} 
+              onPress={generateCode}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Hash size={24} color="white" />
+              )}
+              <Text style={styles.shareButtonText}>
+                {isGenerating ? 'Generating...' : 'Generate Code'}
+              </Text>
+            </TouchableOpacity>
+            
+            {generatedCode && (
+              <View style={styles.codeDisplay}>
+                <Text style={styles.codeLabel}>Your sharing code:</Text>
+                <View style={styles.codeContainer}>
+                  <Text style={styles.codeText}>{generatedCode}</Text>
+                  <TouchableOpacity 
+                    style={styles.copyButton}
+                    onPress={() => copyCodeToClipboard(generatedCode)}
+                  >
+                    <Copy size={16} color="#2196F3" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.codeExpiry}>Expires in 24 hours</Text>
+              </View>
+            )}
+            
+            <Text style={styles.helpText}>Generate a 6-digit code to share this schedule with colleagues</Text>
+          </>
+        ) : (
+          <View style={styles.noScheduleContainer}>
+            <Hash size={32} color="#CCC" />
+            <Text style={styles.noScheduleText}>No schedule available for {selectedDate}</Text>
+            <Text style={styles.helpText}>Create a schedule first or import one using a code below</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Import Schedule</Text>
+        <Text style={styles.inputLabel}>Enter 6-digit code:</Text>
+        <View style={styles.importContainer}>
+          <TextInput
+            style={styles.codeInput}
+            value={importCode}
+            onChangeText={setImportCode}
+            placeholder="123456"
+            placeholderTextColor="#999"
+            keyboardType="numeric"
+            maxLength={6}
+            testID="import-code-input"
+          />
+          <TouchableOpacity 
+            style={[styles.codeButton, styles.importButton]} 
+            onPress={importSchedule}
+            disabled={isImporting || importCode.length !== 6}
+          >
+            {isImporting ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Download size={20} color="white" />
+            )}
+            <Text style={styles.importButtonText}>
+              {isImporting ? 'Importing...' : 'Import'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.helpText}>Import a schedule shared by a colleague using their 6-digit code</Text>
       </View>
 
       <View style={styles.section}>
@@ -189,19 +328,23 @@ export default function ShareScreen() {
         <Text style={styles.helpText}>Share this link so colleagues can access the app instantly</Text>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Share Today&apos;s Schedule</Text>
-        <Text style={styles.date}>{selectedDate}</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={shareSchedule}>
-          <Share size={24} color="white" />
-          <Text style={styles.shareButtonText}>Share Schedule</Text>
-        </TouchableOpacity>
-      </View>
+      {schedule && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Share Today&apos;s Schedule (Text)</Text>
+          <Text style={styles.date}>{selectedDate}</Text>
+          <TouchableOpacity style={styles.shareButton} onPress={shareSchedule}>
+            <Share size={24} color="white" />
+            <Text style={styles.shareButtonText}>Share as Text</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-      <View style={styles.preview}>
-        <Text style={styles.previewTitle}>Schedule Preview</Text>
-        <Text style={styles.previewText}>{generateScheduleText(schedule)}</Text>
-      </View>
+      {schedule && (
+        <View style={styles.preview}>
+          <Text style={styles.previewTitle}>Schedule Preview</Text>
+          <Text style={styles.previewText}>{generateScheduleText(schedule)}</Text>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -311,5 +454,98 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     lineHeight: 22,
+  },
+  codeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+    marginBottom: 8,
+  },
+  generateButton: {
+    backgroundColor: '#FF9800',
+  },
+  importButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    marginLeft: 8,
+  },
+  importButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  codeDisplay: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  codeLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  codeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  codeText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    letterSpacing: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  copyButton: {
+    padding: 4,
+  },
+  codeExpiry: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    fontStyle: 'italic',
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  importContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  codeInput: {
+    flex: 1,
+    borderWidth: 2,
+    borderColor: '#E5E5E5',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    letterSpacing: 2,
+    textAlign: 'center',
+    backgroundColor: 'white',
+  },
+  noScheduleContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  noScheduleText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 8,
+    marginBottom: 4,
+    textAlign: 'center',
   },
 });
