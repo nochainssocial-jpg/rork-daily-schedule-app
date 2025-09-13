@@ -96,6 +96,7 @@ export default function CreateScheduleScreen() {
     };
   }, [scheduleStep]);
 
+  // Stable calculation of whether we can proceed to next step
   const canProceedToNextStep = useMemo(() => {
     switch (scheduleStep) {
       case 1:
@@ -103,9 +104,9 @@ export default function CreateScheduleScreen() {
       case 2:
         return attendingParticipants.length > 0;
       case 3:
-        const assignedParticipants = assignments.flatMap(a => a.participantIds);
-        const unassignedParticipants = attendingParticipants.filter(p => !assignedParticipants.includes(p));
-        return attendingParticipants.length > 0 && unassignedParticipants.length === 0;
+        if (attendingParticipants.length === 0) return false;
+        const assignedCount = assignments.reduce((total, assignment) => total + assignment.participantIds.length, 0);
+        return assignedCount === attendingParticipants.length;
       case 4:
         return true;
       case 5:
@@ -113,7 +114,7 @@ export default function CreateScheduleScreen() {
       default:
         return false;
     }
-  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff]);
+  }, [scheduleStep, workingStaff.length, attendingParticipants.length, assignments, finalChecklistStaff]);
 
   const handleNextStep = useCallback(() => {
     console.log('handleNextStep called, current step:', scheduleStep);
@@ -374,11 +375,11 @@ export default function CreateScheduleScreen() {
             </Text>
             <View style={styles.assignmentList}>
               {!isSaturday() && (
-                <>
+                <View>
                   <Text style={styles.assignmentListItem}>• Front Room time slots</Text>
                   <Text style={styles.assignmentListItem}>• Scotty time slots</Text>
                   <Text style={styles.assignmentListItem}>• Twins time slots</Text>
-                </>
+                </View>
               )}
               <Text style={styles.assignmentListItem}>• Chores distribution</Text>
             </View>
@@ -388,14 +389,14 @@ export default function CreateScheduleScreen() {
               </Text>
             )}
             {!isSaturday() && (
-              <>
+              <View>
                 <Text style={styles.constraintText}>
                   * Antoinette will only be assigned from 2:00pm onwards
                 </Text>
                 <Text style={styles.constraintText}>
                   * No staff member will have consecutive time slots
                 </Text>
-              </>
+              </View>
             )}
           </View>
         );
@@ -486,25 +487,28 @@ export default function CreateScheduleScreen() {
           <Text style={styles.stepIndicator}>Step {scheduleStep} of 5</Text>
         </View>
         
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          style={styles.scrollView} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollViewContent}
+        >
           {renderStepContent()}
-
+        </ScrollView>
+        
+        <View style={styles.nextButtonContainer}>
           <TouchableOpacity 
             style={[styles.nextButton, !canProceedToNextStep && styles.nextButtonDisabled]} 
-            onPress={() => {
-              console.log('Next button pressed, canProceed:', canProceedToNextStep);
-              if (canProceedToNextStep) {
-                handleNextStep();
-              }
-            }}
+            onPress={handleNextStep}
             activeOpacity={canProceedToNextStep ? 0.7 : 1}
+            disabled={!canProceedToNextStep}
           >
             <Text style={[styles.nextButtonText, !canProceedToNextStep && styles.nextButtonTextDisabled]}>
               {scheduleStep === 5 ? 'Complete Schedule' : 'Next'}
             </Text>
             <ChevronRight size={20} color={canProceedToNextStep ? "white" : "#999"} />
           </TouchableOpacity>
-        </ScrollView>
+        </View>
       </View>
     </>
   );
@@ -552,6 +556,9 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: 20,
   },
   selectionContainer: {
     padding: 16,
@@ -695,12 +702,17 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  nextButtonContainer: {
+    padding: 16,
+    backgroundColor: '#F5F5F5',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E5E5',
+  },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#007AFF',
-    margin: 16,
     padding: 16,
     borderRadius: 12,
     gap: 8,
