@@ -113,7 +113,7 @@ export default function CreateScheduleScreen() {
       default:
         return false;
     }
-  }, [scheduleStep, workingStaff.length, attendingParticipants, assignments, finalChecklistStaff]);
+  }, [scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff]);
 
   const handleNextStep = useCallback(() => {
     console.log('handleNextStep called, current step:', scheduleStep);
@@ -316,7 +316,6 @@ export default function CreateScheduleScreen() {
       case 3:
         return (
           <View style={styles.assignmentContainer}>
-            
             {assignments.map(assignment => {
               const staffMember = staff.find((s: Staff) => s.id === assignment.staffId);
               return (
