@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Share as RNShare } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
-import type { Staff, Participant, Chore, TimeSlot } from '@/types/schedule';
+import type { Staff, Participant, Chore, TimeSlot, DropOffAssignment, PickupAssignment } from '@/types/schedule';
 import { RefreshCw, AlertCircle, FileText } from 'lucide-react-native';
 
 export default function ViewPDFScreen() {
@@ -40,9 +40,9 @@ export default function ViewPDFScreen() {
     return date.getDay() === 6;
   }, [selectedDate]);
   
-  // Group drop-offs by staff
-  const getGroupedDropOffs = useCallback(() => {
-    if (!schedule || schedule.dropOffs.length === 0) return [];
+  // Group drop-offs by staff - moved outside conditional rendering
+  const groupedDropOffs = useMemo(() => {
+    if (!schedule || !schedule.dropOffs || schedule.dropOffs.length === 0) return [];
     
     const dropOffsByStaff = schedule.dropOffs.reduce((acc, dropOff) => {
       if (!acc[dropOff.staffId]) {
@@ -58,9 +58,9 @@ export default function ViewPDFScreen() {
     }));
   }, [schedule]);
   
-  // Group pickups by staff
-  const getGroupedPickups = useCallback(() => {
-    if (!schedule || schedule.pickups.length === 0) return [];
+  // Group pickups by staff - moved outside conditional rendering
+  const groupedPickups = useMemo(() => {
+    if (!schedule || !schedule.pickups || schedule.pickups.length === 0) return [];
     
     const pickupsByStaff = schedule.pickups.reduce((acc, pickup) => {
       if (!acc[pickup.staffId]) {
@@ -167,11 +167,10 @@ export default function ViewPDFScreen() {
     // Drop-offs
     scheduleText += `${isSaturday() ? '5' : '8'}. DROP-OFFS\n`;
     scheduleText += `${'-'.repeat(11)}\n`;
-    const groupedDropOffs = getGroupedDropOffs();
     if (groupedDropOffs.length > 0) {
-      groupedDropOffs.forEach((group) => {
+      groupedDropOffs.forEach((group: { staffId: string; dropOffs: DropOffAssignment[] }) => {
         scheduleText += `${getStaffName(group.staffId)}:\n`;
-        scheduleText += `  ${group.dropOffs.map(d => getParticipantName(d.participantId)).join(', ')}\n`;
+        scheduleText += `  ${group.dropOffs.map((d: DropOffAssignment) => getParticipantName(d.participantId)).join(', ')}\n`;
       });
     } else {
       scheduleText += `No drop-offs scheduled\n`;
@@ -181,11 +180,10 @@ export default function ViewPDFScreen() {
     // Pickups
     scheduleText += `${isSaturday() ? '6' : '9'}. PICKUPS\n`;
     scheduleText += `${'-'.repeat(9)}\n`;
-    const groupedPickups = getGroupedPickups();
     if (groupedPickups.length > 0) {
-      groupedPickups.forEach((group) => {
+      groupedPickups.forEach((group: { staffId: string; pickups: PickupAssignment[] }) => {
         scheduleText += `${getStaffName(group.staffId)}:\n`;
-        scheduleText += `  ${group.pickups.map(p => getParticipantName(p.participantId)).join(', ')}\n`;
+        scheduleText += `  ${group.pickups.map((p: PickupAssignment) => getParticipantName(p.participantId)).join(', ')}\n`;
       });
     } else {
       scheduleText += `No pickups scheduled\n`;
@@ -203,7 +201,7 @@ export default function ViewPDFScreen() {
     scheduleText += `App Version: ${appVersion}\n`;
 
     return scheduleText;
-  }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, getGroupedDropOffs, getGroupedPickups]);
+  }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, groupedDropOffs, groupedPickups]);
 
   const shareSchedule = useCallback(async () => {
     if (!schedule) {
@@ -433,14 +431,14 @@ export default function ViewPDFScreen() {
       {/* Drop-offs */}
       <View style={[styles.section, { borderLeftColor: categoryColors.dropOffs }]}>
         <Text style={[styles.sectionTitle, { color: categoryColors.dropOffs }]}>{isSaturday() ? '5' : '8'}. Drop-offs</Text>
-        {getGroupedDropOffs().length > 0 ? (
-          getGroupedDropOffs().map((group, index) => (
+        {groupedDropOffs.length > 0 ? (
+          groupedDropOffs.map((group: { staffId: string; dropOffs: DropOffAssignment[] }, index: number) => (
             <View key={`dropoff-${group.staffId}`} style={styles.dropOffContainer}>
               <Text style={styles.dropOffStaffName}>
                 {getStaffName(group.staffId)}
               </Text>
               <Text style={styles.dropOffParticipants}>
-                {group.dropOffs.map(d => getParticipantName(d.participantId)).join(', ')}
+                {group.dropOffs.map((d: DropOffAssignment) => getParticipantName(d.participantId)).join(', ')}
               </Text>
             </View>
           ))
@@ -452,14 +450,14 @@ export default function ViewPDFScreen() {
       {/* Pickups */}
       <View style={[styles.section, { borderLeftColor: categoryColors.pickups }]}>
         <Text style={[styles.sectionTitle, { color: categoryColors.pickups }]}>{isSaturday() ? '6' : '9'}. Pickups</Text>
-        {getGroupedPickups().length > 0 ? (
-          getGroupedPickups().map((group, index) => (
+        {groupedPickups.length > 0 ? (
+          groupedPickups.map((group: { staffId: string; pickups: PickupAssignment[] }, index: number) => (
             <View key={`pickup-${group.staffId}`} style={styles.pickupContainer}>
               <Text style={styles.pickupStaffName}>
                 {getStaffName(group.staffId)}
               </Text>
               <Text style={styles.pickupParticipants}>
-                {group.pickups.map(p => getParticipantName(p.participantId)).join(', ')}
+                {group.pickups.map((p: PickupAssignment) => getParticipantName(p.participantId)).join(', ')}
               </Text>
             </View>
           ))
