@@ -206,46 +206,54 @@ export default function HomeScreen() {
     setRefreshing(true);
     
     // Animate refresh icon rotation
-    Animated.loop(
+    const rotationAnimation = Animated.loop(
       Animated.timing(rotateValue, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotationAnimation.start();
     
     try {
       console.log('Starting data refresh...');
       console.log('Current selected date:', selectedDate);
       console.log('Current schedules before refresh:', schedules.length);
       
-      // Force reload all data from AsyncStorage by calling the refresh function from schedule store
-      await refreshAllData();
-      console.log('Data refresh completed, checking schedule for date:', selectedDate);
+      // Force reload all data from AsyncStorage
+      const refreshSuccess = await refreshAllData();
       
-      // Force component re-render to pick up fresh data
-      setForceUpdate(prev => prev + 1);
-      
-      // Wait longer for React Query to update
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Check if schedule data is now available
-      const refreshedSchedule = getScheduleForDate(selectedDate);
-      console.log('Schedule after refresh:', refreshedSchedule ? 'Found' : 'Not found');
-      console.log('Total schedules available after refresh:', schedules.length);
-      
-      if (refreshedSchedule) {
-        console.log('Refreshed schedule details:', {
-          id: refreshedSchedule.id,
-          date: refreshedSchedule.date,
-          workingStaff: refreshedSchedule.workingStaff.length,
-          participants: refreshedSchedule.attendingParticipants.length
-        });
+      if (refreshSuccess) {
+        console.log('Data refresh completed successfully');
+        
+        // Force component re-render to pick up fresh data
+        setForceUpdate(prev => prev + 1);
+        
+        // Wait for React Query to propagate changes
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Check if schedule data is now available
+        const refreshedSchedule = getScheduleForDate(selectedDate);
+        console.log('Schedule after refresh:', refreshedSchedule ? 'Found' : 'Not found');
+        console.log('Total schedules available after refresh:', schedules.length);
+        
+        if (refreshedSchedule) {
+          console.log('Refreshed schedule details:', {
+            id: refreshedSchedule.id,
+            date: refreshedSchedule.date,
+            workingStaff: refreshedSchedule.workingStaff.length,
+            participants: refreshedSchedule.attendingParticipants.length
+          });
+        }
+      } else {
+        console.log('Data refresh failed');
       }
       
-      // Small delay for user feedback
+      // Stop rotation animation
+      rotationAnimation.stop();
+      
+      // Reset animations with delay for user feedback
       setTimeout(() => {
-        // Reset animations
         Animated.parallel([
           Animated.timing(pullDistance, {
             toValue: 0,
@@ -266,10 +274,12 @@ export default function HomeScreen() {
         
         setRefreshing(false);
         console.log('Refresh animation completed');
-      }, 800);
+      }, 600);
     } catch (error) {
       console.error('Error refreshing data:', error);
-      setRefreshing(false);
+      
+      // Stop rotation animation
+      rotationAnimation.stop();
       
       // Reset animations on error
       Animated.parallel([
@@ -289,6 +299,8 @@ export default function HomeScreen() {
           useNativeDriver: true,
         }),
       ]).start();
+      
+      setRefreshing(false);
     }
   };
 
@@ -357,7 +369,7 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View key={`home-${forceUpdate}`} style={styles.container}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Text style={styles.headerTitle}>Daily Schedule</Text>
         <Image 
