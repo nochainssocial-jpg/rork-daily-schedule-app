@@ -124,8 +124,12 @@ export default function CreateScheduleScreen() {
           Alert.alert('Selection Required', 'Please select at least one participant.');
           return;
         }
-        // Initialize assignments
-        const initialAssignments = workingStaff.map(staffId => ({
+        // Initialize assignments - exclude Antoinette (Team Leader) from participant assignments
+        const staffForAssignments = workingStaff.filter(staffId => {
+          const staffMember = staff.find((s: Staff) => s.id === staffId);
+          return !staffMember?.isTeamLeader; // Exclude team leader (Antoinette)
+        });
+        const initialAssignments = staffForAssignments.map(staffId => ({
           staffId,
           participantIds: []
         }));
@@ -167,7 +171,7 @@ export default function CreateScheduleScreen() {
         );
         break;
     }
-  }, [canProceedToNextStep, scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff, createSchedule, setScheduleStep]);
+  }, [canProceedToNextStep, scheduleStep, workingStaff, attendingParticipants, assignments, finalChecklistStaff, createSchedule, setScheduleStep, staff]);
 
   const assignParticipantToStaff = (staffId: string, participantId: string) => {
     setAssignments(prev => prev.map(assignment => {
@@ -298,8 +302,21 @@ export default function CreateScheduleScreen() {
         );
 
       case 3:
+        // Check if Antoinette is in working staff
+        const hasAntoinette = workingStaff.some(staffId => {
+          const staffMember = staff.find((s: Staff) => s.id === staffId);
+          return staffMember?.isTeamLeader;
+        });
+        
         return (
           <View style={styles.assignmentContainer}>
+            {hasAntoinette && (
+              <View style={styles.infoBox}>
+                <Text style={styles.infoText}>
+                  Note: Antoinette (Team Leader) manages catering and will not be assigned participants.
+                </Text>
+              </View>
+            )}
             {assignments.map(assignment => {
               const staffMember = staff.find((s: Staff) => s.id === assignment.staffId);
               return (
@@ -686,6 +703,19 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
     textAlign: 'center',
+  },
+  infoBox: {
+    backgroundColor: '#FFF3CD',
+    borderColor: '#FFC107',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#856404',
+    lineHeight: 20,
   },
   nextButtonContainer: {
     padding: 16,
