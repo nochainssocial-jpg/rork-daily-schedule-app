@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, 
 import { Hash, Download, Copy } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
+import ActionButtons from '@/components/ActionButtons';
+import { router } from 'expo-router';
 
 export default function ShareScreen() {
-  const { selectedDate, getScheduleForDate, staff, shareScheduleWithCode, importScheduleWithCode } = useSchedule();
+  const { selectedDate, getScheduleForDate, staff, shareScheduleWithCode, importScheduleWithCode, setScheduleStep, schedules, updateScheduleImmediately } = useSchedule();
   const insets = useSafeAreaInsets();
   const schedule = getScheduleForDate(selectedDate);
   
@@ -84,12 +86,82 @@ export default function ShareScreen() {
     }
   };
 
+  const handleCreatePress = () => {
+    setScheduleStep(1);
+    router.push('/create-schedule');
+  };
+
+  const handleEditPress = () => {
+    router.push('/edit-schedule');
+  };
+
+  const handleSharePress = () => {
+    if (!schedule) {
+      Alert.alert('No Schedule', 'Please create a schedule first');
+      return;
+    }
+    router.push('/share-schedule');
+  };
+
+  const loadLastSchedule = async () => {
+    console.log('Loading last created schedule...');
+    
+    if (schedules.length === 0) {
+      Alert.alert('No Schedules', 'No schedules found to load.');
+      return;
+    }
+    
+    const sortedSchedules = [...schedules].sort((a, b) => {
+      return new Date(b.date).getTime() - new Date(a.date).getTime();
+    });
+    
+    const lastSchedule = sortedSchedules[0];
+    
+    if (lastSchedule.date === selectedDate) {
+      Alert.alert('Already Loaded', 'The most recent schedule is already loaded for today.');
+      return;
+    }
+    
+    const todaySchedule = {
+      ...lastSchedule,
+      id: `schedule-${selectedDate}`,
+      date: selectedDate
+    };
+    
+    try {
+      await updateScheduleImmediately(todaySchedule);
+      
+      Alert.alert(
+        'Schedule Loaded', 
+        `Successfully loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today.`
+      );
+    } catch (error) {
+      console.error('Error loading last schedule:', error);
+      Alert.alert('Error', 'Failed to load the last schedule. Please try again.');
+    }
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Share & Collaborate</Text>
+    <View style={styles.container}>
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+        <Text style={styles.headerTitle}>Share & Collaborate</Text>
+      </View>
+      
+      <View style={styles.actionButtonsTop}>
+        <ActionButtons
+          onCreatePress={handleCreatePress}
+          onEditPress={handleEditPress}
+          onSharePress={handleSharePress}
+          onLoadLastPress={loadLastSchedule}
+          hasSchedules={schedules.length > 0}
+        />
+      </View>
+
+      <View style={styles.headerSection}>
         <Text style={styles.subtitle}>Share schedules with 6-digit codes</Text>
       </View>
+
+      <ScrollView style={styles.scrollView}>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
@@ -174,7 +246,8 @@ export default function ShareScreen() {
 
 
 
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -183,21 +256,47 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
-  header: {
+  headerBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  headerTitle: {
+    fontSize: 27,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  actionButtonsTop: {
+    backgroundColor: '#fff',
+    paddingTop: 6,
+    paddingBottom: 4,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  headerSection: {
     padding: 20,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E5',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginTop: 4,
+    textAlign: 'center',
+  },
+  scrollView: {
+    flex: 1,
   },
   section: {
     backgroundColor: 'white',
