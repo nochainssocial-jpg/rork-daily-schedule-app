@@ -298,9 +298,32 @@ export default function HomeScreen() {
     setIsRefreshing(true);
     
     try {
+      // First, let's check what's actually in AsyncStorage
+      const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+      console.log('=== DIAGNOSTIC CHECK ===');
+      
+      try {
+        const storedSchedules = await AsyncStorage.getItem('schedules');
+        if (storedSchedules) {
+          console.log('Raw schedules data exists, length:', storedSchedules.length);
+          const parsed = JSON.parse(storedSchedules);
+          console.log('Parsed schedules count:', parsed.length);
+          if (parsed.length > 0) {
+            console.log('Schedule dates in storage:', parsed.map((s: any) => s.date));
+          }
+        } else {
+          console.log('No schedules data in AsyncStorage');
+        }
+      } catch (diagError) {
+        console.error('Diagnostic check failed:', diagError);
+      }
+      
       const success = await refreshAllData();
       if (success) {
         console.log('Manual refresh completed successfully');
+        // After refresh, check what we have
+        console.log('After refresh - schedules count:', schedules.length);
+        console.log('After refresh - today schedule:', !!todaySchedule);
       } else {
         console.log('Manual refresh completed with issues');
       }

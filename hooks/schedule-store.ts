@@ -252,11 +252,15 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     queryKey: ['schedules'],
     queryFn: async () => {
       try {
+        console.log('Loading schedules from AsyncStorage...');
         const stored = await AsyncStorage.getItem('schedules');
+        
         if (!stored || stored === 'undefined' || stored === 'null') {
-          console.log('No schedules data found, using empty array');
+          console.log('No schedules data found in AsyncStorage, returning empty array');
           return [];
         }
+        
+        console.log('Raw schedules data length:', stored.length);
         
         // Validate JSON before parsing
         const trimmed = stored.trim();
@@ -273,13 +277,20 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
           return [];
         }
         
+        console.log('Successfully loaded', parsed.length, 'schedules from storage');
+        if (parsed.length > 0) {
+          console.log('Available schedule dates:', parsed.map((s: Schedule) => s.date));
+        }
+        
         return parsed;
       } catch (error) {
         console.error('Error parsing schedules data:', error);
         await AsyncStorage.removeItem('schedules');
         return [];
       }
-    }
+    },
+    staleTime: 0, // Always fetch fresh data
+    gcTime: 1000 * 60 * 5, // Keep in cache for 5 minutes
   });
 
   // Track critical updates
@@ -369,20 +380,41 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
 
   const saveScheduleMutation = useMutation({
     mutationFn: async (schedule: Schedule) => {
-      const schedules = schedulesQuery.data || [];
-      const existingIndex = schedules.findIndex((s: Schedule) => s.date === schedule.date);
+      console.log('Saving schedule for date:', schedule.date);
+      
+      // Get current schedules directly from AsyncStorage to ensure we have the latest data
+      let currentSchedules: Schedule[] = [];
+      try {
+        const stored = await AsyncStorage.getItem('schedules');
+        if (stored && stored !== 'undefined' && stored !== 'null') {
+          const trimmed = stored.trim();
+          if (trimmed && (trimmed.startsWith('[') || trimmed.startsWith('{'))) {
+            currentSchedules = JSON.parse(trimmed);
+            if (!Array.isArray(currentSchedules)) {
+              currentSchedules = [];
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error reading current schedules:', error);
+        currentSchedules = schedulesQuery.data || [];
+      }
+      
+      const existingIndex = currentSchedules.findIndex((s: Schedule) => s.date === schedule.date);
       
       const isNew = existingIndex < 0;
       
       if (existingIndex >= 0) {
-        schedules[existingIndex] = schedule;
+        currentSchedules[existingIndex] = schedule;
+        console.log('Updated existing schedule at index:', existingIndex);
       } else {
-        schedules.push(schedule);
+        currentSchedules.push(schedule);
+        console.log('Added new schedule, total schedules:', currentSchedules.length);
       }
       
       // Save to AsyncStorage with error handling
       try {
-        const schedulesJson = JSON.stringify(schedules);
+        const schedulesJson = JSON.stringify(currentSchedules);
         
         // Validate the JSON before saving
         if (!schedulesJson || schedulesJson === 'undefined' || schedulesJson === 'null' || schedulesJson.trim() === '') {
@@ -398,6 +430,14 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         }
         
         await AsyncStorage.setItem('schedules', schedulesJson);
+        console.log('Successfully saved schedules to AsyncStorage');
+        
+        // Verify the save
+        const verification = await AsyncStorage.getItem('schedules');
+        if (verification) {
+          const verifiedSchedules = JSON.parse(verification);
+          console.log('Verification: Saved', verifiedSchedules.length, 'schedules to storage');
+        }
       } catch (error) {
         console.error('Error saving schedule to AsyncStorage:', error);
         throw error;
@@ -436,11 +476,16 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         console.error('Error saving category updates:', error);
       }
       
-      return schedules;
+      return currentSchedules;
     },
     onSuccess: async (schedules) => {
+      console.log('Schedule mutation succeeded, invalidating queries...');
       await queryClient.invalidateQueries({ queryKey: ['schedules'] });
       await trackCriticalUpdate('schedule_saved');
+      
+      // Force a refetch to ensure UI is updated
+      await queryClient.refetchQueries({ queryKey: ['schedules'] });
+      console.log('Queries invalidated and refetched');
     },
     onError: (error) => {
       console.error('Schedule save mutation failed:', error);
@@ -985,6 +1030,76 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       return false;
     }
   }, [queryClient]);
+  
+  // Diagnostic function to check data integrity
+  const checkDataIntegrity = useCallback(async () => {
+    console.log('=== DATA INTEGRITY CHECK ===');
+    const issues: string[] = [];
+    
+    try {
+      // Check schedules
+      const schedulesData = await AsyncStorage.getItem('schedules');
+      if (schedulesData) {
+        try {
+          const parsed = JSON.parse(schedulesData);
+          if (!Array.isArray(parsed)) {
+            issues.push('Schedules data is not an array');
+          } else {
+            console.log(`✓ Schedules: ${parsed.length} items`);
+          }
+        } catch (e) {
+          issues.push('Schedules data is corrupted (invalid JSON)');
+        }
+      } else {
+        console.log('✓ Schedules: No data (will use empty array)');
+      }
+      
+      // Check staff
+      const staffData = await AsyncStorage.getItem('staff');
+      if (staffData) {
+        try {
+          const parsed = JSON.parse(staffData);
+          if (!Array.isArray(parsed)) {
+            issues.push('Staff data is not an array');
+          } else {
+            console.log(`✓ Staff: ${parsed.length} items`);
+          }
+        } catch (e) {
+          issues.push('Staff data is corrupted (invalid JSON)');
+        }
+      } else {
+        console.log('✓ Staff: No data (will use defaults)');
+      }
+      
+      // Check participants
+      const participantsData = await AsyncStorage.getItem('participants');
+      if (participantsData) {
+        try {
+          const parsed = JSON.parse(participantsData);
+          if (!Array.isArray(parsed)) {
+            issues.push('Participants data is not an array');
+          } else {
+            console.log(`✓ Participants: ${parsed.length} items`);
+          }
+        } catch (e) {
+          issues.push('Participants data is corrupted (invalid JSON)');
+        }
+      } else {
+        console.log('✓ Participants: No data (will use defaults)');
+      }
+      
+      if (issues.length > 0) {
+        console.error('Data integrity issues found:', issues);
+        return { success: false, issues };
+      }
+      
+      console.log('=== DATA INTEGRITY CHECK PASSED ===');
+      return { success: true, issues: [] };
+    } catch (error) {
+      console.error('Error checking data integrity:', error);
+      return { success: false, issues: ['Failed to check data integrity'] };
+    }
+  }, []);
 
   // Run cleanup on app start
   useEffect(() => {
@@ -1038,6 +1153,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     cleanupExpiredCodes,
     
     // Utility functions
-    clearCorruptedData
+    clearCorruptedData,
+    checkDataIntegrity
   };
 });

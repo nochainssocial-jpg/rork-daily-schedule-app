@@ -7,9 +7,11 @@ import {
   SafeAreaView,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { ChevronRight, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { ChevronRight, AlertCircle, RefreshCw, Settings, Trash2, FileText } from 'lucide-react-native';
 import { useSchedule } from '@/hooks/schedule-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface HelpSectionProps {
   title: string;
@@ -31,8 +33,19 @@ const HelpSection: React.FC<HelpSectionProps> = ({ title, description, items }) 
 );
 
 export default function HelpScreen() {
-  const { hasNewUpdates, markUpdatesAsViewed, appVersion } = useSchedule();
+  const { 
+    hasNewUpdates, 
+    markUpdatesAsViewed, 
+    appVersion,
+    checkDataIntegrity,
+    clearCorruptedData,
+    refreshAllData
+  } = useSchedule();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isChecking, setIsChecking] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastCheckResult, setLastCheckResult] = useState<{ success: boolean; issues: string[] } | null>(null);
 
   // Auto-refresh when critical updates are detected
   useEffect(() => {
@@ -59,6 +72,107 @@ export default function HelpScreen() {
       markUpdatesAsViewed();
     }
     setRefreshKey(prev => prev + 1);
+  };
+  
+  const handleCheckIntegrity = async () => {
+    setIsChecking(true);
+    try {
+      const result = await checkDataIntegrity();
+      setLastCheckResult(result);
+      
+      if (result.success) {
+        Alert.alert('Data Check', 'All data is healthy! No issues found.');
+      } else {
+        Alert.alert(
+          'Data Issues Found',
+          `Found ${result.issues.length} issue(s):\n\n${result.issues.join('\n')}\n\nConsider using "Clear All Data" to reset.`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to check data integrity');
+    } finally {
+      setIsChecking(false);
+    }
+  };
+  
+  const handleClearData = () => {
+    Alert.alert(
+      'Clear All Data',
+      'This will delete ALL stored data including schedules and reset to defaults. This action cannot be undone. Continue?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            setIsClearing(true);
+            try {
+              const success = await clearCorruptedData();
+              if (success) {
+                await refreshAllData();
+                Alert.alert('Success', 'All data has been cleared and reset to defaults.');
+                setLastCheckResult(null);
+              } else {
+                Alert.alert('Error', 'Failed to clear data');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to clear data');
+            } finally {
+              setIsClearing(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+  
+  const handleRefreshData = async () => {
+    setIsRefreshing(true);
+    try {
+      const success = await refreshAllData();
+      if (success) {
+        Alert.alert('Success', 'Data refreshed successfully');
+      } else {
+        Alert.alert('Warning', 'Data refresh completed with some issues');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to refresh data');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+  
+  const handleExportDebugLog = async () => {
+    try {
+      const allKeys = await AsyncStorage.getAllKeys();
+      const debugInfo: any = {};
+      
+      for (const key of allKeys) {
+        try {
+          const value = await AsyncStorage.getItem(key);
+          if (value) {
+            // Try to parse JSON, if it fails, store as string
+            try {
+              debugInfo[key] = JSON.parse(value);
+            } catch {
+              debugInfo[key] = value;
+            }
+          }
+        } catch (error) {
+          debugInfo[key] = 'ERROR_READING';
+        }
+      }
+      
+      console.log('=== DEBUG EXPORT ===');
+      console.log('Total keys:', allKeys.length);
+      console.log('Data:', JSON.stringify(debugInfo, null, 2));
+      console.log('=== END DEBUG EXPORT ===');
+      
+      Alert.alert('Debug Log', `Exported ${allKeys.length} keys to console. Check developer console for details.`);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to export debug log');
+    }
   };
 
   return (
@@ -209,6 +323,84 @@ export default function HelpScreen() {
             "The app works offline - no internet connection required"
           ]}
         />
+        
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Troubleshooting</Text>
+          <Text style={styles.sectionDescription}>
+            If you're experiencing issues with data not loading or saving correctly, use these diagnostic tools:
+          </Text>
+          
+          <TouchableOpacity
+            style={[styles.diagnosticsButton, { backgroundColor: '#4CAF50' }]}
+            onPress={handleCheckIntegrity}
+            disabled={isChecking}
+          >
+            {isChecking ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Settings size={20} color="white" style={{ marginRight: 8 }} />
+                <Text style={styles.diagnosticsButtonText}>Check Data Integrity</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.diagnosticsButton, { backgroundColor: '#2196F3' }]}
+            onPress={handleRefreshData}
+            disabled={isRefreshing}
+          >
+            {isRefreshing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <RefreshCw size={20} color="white" style={{ marginRight: 8 }} />
+                <Text style={styles.diagnosticsButtonText}>Refresh All Data</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            style={[styles.diagnosticsButton, { backgroundColor: '#FF9800' }]}
+            onPress={handleExportDebugLog}
+          >
+            <FileText size={20} color="white" style={{ marginRight: 8 }} />
+            <Text style={styles.diagnosticsButtonText}>Export Debug Log to Console</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.diagnosticsDivider} />
+          
+          <Text style={styles.diagnosticsWarning}>⚠️ Danger Zone</Text>
+          <Text style={styles.diagnosticsDescription}>
+            Only use this if you're experiencing persistent issues. This will delete ALL your schedules and data:
+          </Text>
+          
+          <TouchableOpacity
+            style={[styles.diagnosticsButton, { backgroundColor: '#F44336' }]}
+            onPress={handleClearData}
+            disabled={isClearing}
+          >
+            {isClearing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Trash2 size={20} color="white" style={{ marginRight: 8 }} />
+                <Text style={styles.diagnosticsButtonText}>Clear All Data & Reset</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          
+          {lastCheckResult && (
+            <View style={styles.diagnosticsResult}>
+              <Text style={styles.diagnosticsResultTitle}>
+                Last Check: {lastCheckResult.success ? '✅ Healthy' : '⚠️ Issues Found'}
+              </Text>
+              {!lastCheckResult.success && lastCheckResult.issues.map((issue, index) => (
+                <Text key={index} style={styles.diagnosticsIssue}>• {issue}</Text>
+              ))}
+            </View>
+          )}
+        </View>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
@@ -334,7 +526,55 @@ const styles = StyleSheet.create({
   footerText: {
     fontSize: 14,
     color: '#999',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    textAlign: 'center' as const,
+    fontStyle: 'italic' as const,
+  },
+  diagnosticsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  diagnosticsButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600' as const,
+  },
+  diagnosticsDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 15,
+  },
+  diagnosticsWarning: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    color: '#F44336',
+    marginBottom: 8,
+  },
+  diagnosticsDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+    lineHeight: 20,
+  },
+  diagnosticsResult: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  diagnosticsResultTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    marginBottom: 8,
+    color: '#333',
+  },
+  diagnosticsIssue: {
+    fontSize: 13,
+    color: '#666',
+    marginLeft: 10,
+    marginTop: 4,
   },
 });
