@@ -445,17 +445,26 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   const refreshAllData = async () => {
     console.log('Refreshing all data from AsyncStorage...');
     
-    // Invalidate all queries to force fresh data fetch from AsyncStorage
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['staff'] }),
-      queryClient.invalidateQueries({ queryKey: ['participants'] }),
-      queryClient.invalidateQueries({ queryKey: ['chores'] }),
-      queryClient.invalidateQueries({ queryKey: ['checklist'] }),
-      queryClient.invalidateQueries({ queryKey: ['schedules'] })
-    ]);
-    
-    // Reload category updates for current date
     try {
+      // First, invalidate all queries to force fresh data fetch from AsyncStorage
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['staff'] }),
+        queryClient.invalidateQueries({ queryKey: ['participants'] }),
+        queryClient.invalidateQueries({ queryKey: ['chores'] }),
+        queryClient.invalidateQueries({ queryKey: ['checklist'] }),
+        queryClient.invalidateQueries({ queryKey: ['schedules'] })
+      ]);
+      
+      // Wait for queries to refetch
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: ['staff'] }),
+        queryClient.refetchQueries({ queryKey: ['participants'] }),
+        queryClient.refetchQueries({ queryKey: ['chores'] }),
+        queryClient.refetchQueries({ queryKey: ['checklist'] }),
+        queryClient.refetchQueries({ queryKey: ['schedules'] })
+      ]);
+      
+      // Reload category updates for current date
       const updates = await AsyncStorage.getItem(`categoryUpdates_${selectedDate}`);
       if (updates) {
         setCategoryUpdates(JSON.parse(updates));
@@ -464,12 +473,12 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         setCategoryUpdates([]);
         console.log('No category updates found for date:', selectedDate);
       }
+      
+      console.log('Data refresh completed successfully');
     } catch (error) {
-      console.error('Error reloading category updates:', error);
+      console.error('Error during data refresh:', error);
       setCategoryUpdates([]);
     }
-    
-    console.log('Data refresh completed');
   };
 
   return {

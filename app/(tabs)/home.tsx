@@ -35,12 +35,14 @@ export default function HomeScreen() {
     setScheduleStep,
     getScheduleForDate,
     categoryUpdates,
-    refreshAllData
+    refreshAllData,
+    schedules
   } = useSchedule();
   const insets = useSafeAreaInsets();
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
   
   // Pull to refresh animation values
   const pullDistance = useRef(new Animated.Value(0)).current;
@@ -93,6 +95,21 @@ export default function HomeScreen() {
   }, [categoryUpdates]);
 
   const todaySchedule = getScheduleForDate(selectedDate);
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('Home screen - Selected date:', selectedDate);
+    console.log('Home screen - Today schedule:', todaySchedule ? 'Found' : 'Not found');
+    console.log('Home screen - Total schedules:', schedules.length);
+    console.log('Home screen - Force update counter:', forceUpdate);
+    if (todaySchedule) {
+      console.log('Schedule ID:', todaySchedule.id);
+      console.log('Schedule date:', todaySchedule.date);
+    }
+    if (schedules.length > 0) {
+      console.log('Available schedule dates:', schedules.map((s: any) => s.date));
+    }
+  }, [selectedDate, todaySchedule, schedules, forceUpdate]);
   
   // Parse the date string and create a date object
   const [year, month, day] = selectedDate.split('-').map(Number);
@@ -175,6 +192,7 @@ export default function HomeScreen() {
   });
 
   const onRefresh = async () => {
+    console.log('Pull to refresh triggered');
     setRefreshing(true);
     
     // Animate refresh icon rotation
@@ -187,8 +205,21 @@ export default function HomeScreen() {
     ).start();
     
     try {
+      console.log('Starting data refresh...');
       // Force reload all data from AsyncStorage by calling the refresh function from schedule store
       await refreshAllData();
+      console.log('Data refresh completed, checking schedule for date:', selectedDate);
+      
+      // Force component re-render to pick up fresh data
+      setForceUpdate(prev => prev + 1);
+      
+      // Small delay to allow React Query to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Check if schedule data is now available
+      const refreshedSchedule = getScheduleForDate(selectedDate);
+      console.log('Schedule after refresh:', refreshedSchedule ? 'Found' : 'Not found');
+      console.log('Total schedules available:', schedules.length);
       
       // Small delay for user feedback
       setTimeout(() => {
@@ -212,6 +243,7 @@ export default function HomeScreen() {
         ]).start();
         
         setRefreshing(false);
+        console.log('Refresh animation completed');
       }, 800);
     } catch (error) {
       console.error('Error refreshing data:', error);
