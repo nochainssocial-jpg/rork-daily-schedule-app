@@ -81,10 +81,16 @@ export default function ShareScreen() {
   }
 
   const shareApp = async () => {
-    const appUrl = window.location.origin; // Gets the current web URL
-    const shareText = `Check out this Daily Schedule app! Access it here: ${appUrl}`;
+    let appUrl = 'https://your-app-url.com'; // Default fallback URL
+    let shareText = '';
     
     if (Platform.OS === 'web') {
+      // Use window.location safely for web
+      if (typeof window !== 'undefined' && window.location) {
+        appUrl = window.location.origin;
+      }
+      shareText = `Check out this Daily Schedule app! Access it here: ${appUrl}`;
+      
       if (navigator.share) {
         try {
           await navigator.share({
@@ -94,14 +100,33 @@ export default function ShareScreen() {
           });
         } catch (error) {
           console.log('Error sharing app:', error);
+          Alert.alert('Error', 'Unable to share app link');
         }
       } else {
-        navigator.clipboard.writeText(shareText);
-        Alert.alert('Copied', 'App link copied to clipboard! Share it with your colleagues.');
+        try {
+          await navigator.clipboard.writeText(shareText);
+          Alert.alert('Copied', 'App link copied to clipboard! Share it with your colleagues.');
+        } catch (error) {
+          console.log('Error copying to clipboard:', error);
+          Alert.alert('Error', 'Unable to copy app link');
+        }
       }
     } else {
+      // For mobile, share a general message about the app
+      shareText = 'Check out this Daily Schedule app! It helps organize staff schedules and participant attendance.';
+      
       try {
-        await Sharing.shareAsync('data:text/plain;base64,' + btoa(shareText));
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync('data:text/plain;base64,' + btoa(shareText));
+        } else {
+          // Fallback to SMS if sharing is not available
+          const isAvailable = await SMS.isAvailableAsync();
+          if (isAvailable) {
+            await SMS.sendSMSAsync([], shareText);
+          } else {
+            Alert.alert('Error', 'Sharing is not available on this device');
+          }
+        }
       } catch (error) {
         console.log('Error sharing app:', error);
         Alert.alert('Error', 'Unable to share app link');
