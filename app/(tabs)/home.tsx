@@ -275,8 +275,6 @@ export default function HomeScreen() {
     }
   };
 
-
-
   const getNotificationColor = () => {
     if (!categoryUpdates || categoryUpdates.length === 0) return { bg: '#C8E6C9', text: '#2E7D32' };
     
