@@ -166,8 +166,8 @@ setup_directories() {
 install_app() {
     print_step "Installing application files..."
     
-    # Copy application files
-    cp -r . "$INSTALL_DIR/"
+    # Copy application files from the source directory
+    cp -r "$APP_SOURCE_DIR"/* "$INSTALL_DIR/"
     
     # Install dependencies
     cd "$INSTALL_DIR"
@@ -316,11 +316,21 @@ show_completion() {
 main() {
     print_header
     
-    # Check if we're in the right directory
-    if [ ! -f "package.json" ]; then
-        print_error "This script must be run from the Daily Schedule App directory"
+    # Find the app directory
+    APP_SOURCE_DIR="."
+    if [ -f "package.json" ]; then
+        # We're in the app directory
+        APP_SOURCE_DIR="."
+    elif [ -d "daily-schedule-app" ] && [ -f "daily-schedule-app/package.json" ]; then
+        # App is in subdirectory
+        APP_SOURCE_DIR="daily-schedule-app"
+    else
+        print_error "Cannot find Daily Schedule App directory with package.json"
+        print_info "Please ensure you're in the correct directory or the app files are extracted properly"
         exit 1
     fi
+    
+    print_info "Found app directory: $APP_SOURCE_DIR"
     
     check_architecture
     install_node
