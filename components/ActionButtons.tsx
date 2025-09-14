@@ -35,7 +35,7 @@ export default function ActionButtons({ onCreatePress, onEditPress, onSharePress
         onPress={onRefreshPress}
         disabled={isRefreshing}
       >
-        <RefreshCw size={16} color="white" style={isRefreshing ? { transform: [{ rotate: '180deg' }] } : {}} />
+        <RefreshCw size={16} color="white" />
         <Text style={styles.buttonText}>Refresh</Text>
       </TouchableOpacity>
 

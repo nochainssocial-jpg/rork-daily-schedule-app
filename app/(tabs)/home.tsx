@@ -464,9 +464,9 @@ export default function HomeScreen() {
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
                 {schedules.length > 0 ? (
-                  <Text style={styles.loadHintText}>Use &quot;Load&quot; button to copy your most recent schedule</Text>
+                  <Text style={styles.loadHintText}>Use Load button to copy your most recent schedule</Text>
                 ) : (
-                  <Text style={styles.loadHintText}>Use &quot;Refresh&quot; button to check for existing schedules</Text>
+                  <Text style={styles.loadHintText}>Use Refresh button to check for existing schedules</Text>
                 )}
                 
                 {/* Debug info for development */}
