@@ -518,44 +518,98 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     const scotty: TimeSlotAssignment[] = [];
     const twins: TimeSlotAssignment[] = [];
 
-    const usedStaffPerSlot: { [key: string]: string[] } = {};
+    // Track staff assignments across all slots and categories
+    const staffAssignments: { [staffId: string]: string[] } = {}; // staffId -> [timeSlotIds]
+    const usedStaffPerSlot: { [key: string]: string[] } = {}; // timeSlotId -> [staffIds]
 
-    TIME_SLOTS.forEach(slot => {
-      const availableForSlot = getAvailableStaffForSlot(slot.id);
+    // Initialize tracking
+    availableStaff.forEach(staff => {
+      staffAssignments[staff.id] = [];
+    });
+
+    // Helper function to check if staff can be assigned to a slot
+    const canAssignStaff = (staffId: string, timeSlotId: string): boolean => {
+      const currentSlotNum = parseInt(timeSlotId);
+      const assignedSlots = staffAssignments[staffId] || [];
       
-      // Track which staff are used in this time slot across all categories
-      usedStaffPerSlot[slot.id] = [];
+      // Rule 1: Staff can only be assigned 1 time slot at a time (across all categories)
+      if (assignedSlots.includes(timeSlotId)) {
+        return false;
+      }
+      
+      // Rule 2: Staff cannot be assigned 2 consecutive time slots
+      const hasConsecutive = assignedSlots.some(assignedSlot => {
+        const assignedSlotNum = parseInt(assignedSlot);
+        return Math.abs(currentSlotNum - assignedSlotNum) === 1;
+      });
+      
+      if (hasConsecutive) {
+        return false;
+      }
+      
+      return true;
+    };
 
-      // Assign to Front Room
-      const availableForFrontRoom = availableForSlot.filter((s: Staff) => 
-        !usedStaffPerSlot[slot.id].includes(s.id)
+    // Helper function to assign staff to a category for a time slot
+    const assignStaffToSlot = (category: 'frontRoom' | 'scotty' | 'twins', timeSlotId: string): string | null => {
+      const availableForSlot = getAvailableStaffForSlot(timeSlotId);
+      
+      // Filter staff that can be assigned to this slot
+      const eligibleStaff = availableForSlot.filter((s: Staff) => 
+        canAssignStaff(s.id, timeSlotId) && 
+        !(usedStaffPerSlot[timeSlotId] || []).includes(s.id)
       );
-      if (availableForFrontRoom.length > 0) {
-        const randomStaff = availableForFrontRoom[Math.floor(Math.random() * availableForFrontRoom.length)];
-        frontRoom.push({ timeSlotId: slot.id, staffId: randomStaff.id });
-        usedStaffPerSlot[slot.id].push(randomStaff.id);
+      
+      if (eligibleStaff.length === 0) {
+        return null;
+      }
+      
+      // Randomize selection for better distribution
+      const randomStaff = eligibleStaff[Math.floor(Math.random() * eligibleStaff.length)];
+      
+      // Track the assignment
+      if (!staffAssignments[randomStaff.id]) {
+        staffAssignments[randomStaff.id] = [];
+      }
+      staffAssignments[randomStaff.id].push(timeSlotId);
+      
+      if (!usedStaffPerSlot[timeSlotId]) {
+        usedStaffPerSlot[timeSlotId] = [];
+      }
+      usedStaffPerSlot[timeSlotId].push(randomStaff.id);
+      
+      return randomStaff.id;
+    };
+
+    // Assign staff to all time slots for all categories
+    TIME_SLOTS.forEach(slot => {
+      // Initialize slot tracking
+      usedStaffPerSlot[slot.id] = [];
+      
+      // Assign to Front Room
+      const frontRoomStaffId = assignStaffToSlot('frontRoom', slot.id);
+      if (frontRoomStaffId) {
+        frontRoom.push({ timeSlotId: slot.id, staffId: frontRoomStaffId });
       }
 
       // Assign to Scotty
-      const availableForScotty = availableForSlot.filter((s: Staff) => 
-        !usedStaffPerSlot[slot.id].includes(s.id)
-      );
-      if (availableForScotty.length > 0) {
-        const randomStaff = availableForScotty[Math.floor(Math.random() * availableForScotty.length)];
-        scotty.push({ timeSlotId: slot.id, staffId: randomStaff.id });
-        usedStaffPerSlot[slot.id].push(randomStaff.id);
+      const scottyStaffId = assignStaffToSlot('scotty', slot.id);
+      if (scottyStaffId) {
+        scotty.push({ timeSlotId: slot.id, staffId: scottyStaffId });
       }
 
       // Assign to Twins
-      const availableForTwins = availableForSlot.filter((s: Staff) => 
-        !usedStaffPerSlot[slot.id].includes(s.id)
-      );
-      if (availableForTwins.length > 0) {
-        const randomStaff = availableForTwins[Math.floor(Math.random() * availableForTwins.length)];
-        twins.push({ timeSlotId: slot.id, staffId: randomStaff.id });
-        usedStaffPerSlot[slot.id].push(randomStaff.id);
+      const twinsStaffId = assignStaffToSlot('twins', slot.id);
+      if (twinsStaffId) {
+        twins.push({ timeSlotId: slot.id, staffId: twinsStaffId });
       }
     });
+
+    console.log('Time slot assignments generated:');
+    console.log('Staff assignments summary:', staffAssignments);
+    console.log('Front Room slots:', frontRoom.length);
+    console.log('Scotty slots:', scotty.length);
+    console.log('Twins slots:', twins.length);
 
     return { frontRoom, scotty, twins };
   };
