@@ -5,7 +5,7 @@
   "installCommand": "npm install",
   "functions": {
     "backend/hono.ts": {
-      "runtime": "nodejs20.x"
+      "runtime": "nodejs18.x"
     }
   },
   "rewrites": [
