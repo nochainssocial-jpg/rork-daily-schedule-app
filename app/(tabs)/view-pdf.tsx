@@ -91,7 +91,7 @@ export default function ViewPDFScreen() {
 
     let scheduleText = `DAILY SCHEDULE - ${(() => {
       const [year, month, day] = selectedDate.split('-');
-      return `${day}/${month}/${year}`;
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
     })()}\n`;
     scheduleText += `${'='.repeat(50)}\n\n`;
 
@@ -220,7 +220,7 @@ export default function ViewPDFScreen() {
         message: scheduleText,
         title: `Daily Schedule - ${(() => {
           const [year, month, day] = selectedDate.split('-');
-          return `${day}/${month}/${year}`;
+          return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
         })()}`,
       };
       
@@ -301,7 +301,7 @@ export default function ViewPDFScreen() {
             <Text style={styles.title}>Schedule Overview</Text>
             <Text style={styles.date}>{(() => {
               const [year, month, day] = selectedDate.split('-');
-              return `${day}/${month}/${year}`;
+              return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
             })()}</Text>
           </View>
           <TouchableOpacity 

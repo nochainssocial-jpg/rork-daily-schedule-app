@@ -147,6 +147,7 @@ export default function ShareScreen() {
           onEditPress={handleEditPress}
           onSharePress={handleSharePress}
           onLoadLastPress={loadLastSchedule}
+          onRefreshPress={() => {}}
           hasSchedules={schedules.length > 0}
         />
       </View>
@@ -158,7 +159,10 @@ export default function ShareScreen() {
       <ScrollView style={styles.scrollView}>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
-          <Text style={styles.date}>{selectedDate}</Text>
+          <Text style={styles.date}>{(() => {
+            const [year, month, day] = selectedDate.split('-');
+            return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+          })()}</Text>
           
           {schedule ? (
             <>
@@ -198,7 +202,10 @@ export default function ShareScreen() {
           ) : (
             <View style={styles.noScheduleContainer}>
               <Hash size={32} color="#CCC" />
-              <Text style={styles.noScheduleText}>No schedule available for {selectedDate}</Text>
+              <Text style={styles.noScheduleText}>No schedule available for {(() => {
+                const [year, month, day] = selectedDate.split('-');
+                return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+              })()}</Text>
               <Text style={styles.helpText}>Create a schedule first or import one using a code below</Text>
             </View>
           )}
