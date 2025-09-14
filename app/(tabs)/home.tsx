@@ -159,7 +159,10 @@ export default function HomeScreen() {
           // Show a brief notification to user
           Alert.alert(
             'Schedule Loaded',
-            `Loaded your most recent schedule from ${new Date(lastSchedule.date).toLocaleDateString()}`,
+            `Loaded your most recent schedule from ${(() => {
+              const date = new Date(lastSchedule.date);
+              return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+            })()}`,
             [{ text: 'OK' }],
             { cancelable: true }
           );
@@ -237,7 +240,10 @@ export default function HomeScreen() {
       
       Alert.alert(
         'Schedule Loaded', 
-        `Successfully loaded schedule from ${new Date(lastSchedule.date).toLocaleDateString()} for today.`
+        `Successfully loaded schedule from ${(() => {
+          const date = new Date(lastSchedule.date);
+          return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
+        })()} for today.`
       );
     } catch (error) {
       console.error('Error loading last schedule:', error);

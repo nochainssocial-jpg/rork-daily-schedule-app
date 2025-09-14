@@ -197,7 +197,10 @@ export default function ViewPDFScreen() {
     scheduleText += `\n`;
 
     scheduleText += `${'='.repeat(50)}\n`;
-    scheduleText += `Generated on: ${new Date().toLocaleString()}\n`;
+    scheduleText += `Generated on: ${(() => {
+      const now = new Date();
+      return `${now.getDate().toString().padStart(2, '0')}/${(now.getMonth() + 1).toString().padStart(2, '0')}/${now.getFullYear()} ${now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })}`;
+    })()}\n`;
     scheduleText += `App Version: ${appVersion}\n`;
 
     return scheduleText;
