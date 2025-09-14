@@ -39,12 +39,10 @@ export default function ActionButtons({ onCreatePress, onEditPress, onSharePress
         <Text style={styles.buttonText}>Refresh</Text>
       </TouchableOpacity>
 
-      {hasSchedules && (
-        <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
-          <Download size={16} color="white" />
-          <Text style={styles.buttonText}>Load</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
+        <Download size={16} color="white" />
+        <Text style={styles.buttonText}>Load</Text>
+      </TouchableOpacity>
     </View>
   );
 }

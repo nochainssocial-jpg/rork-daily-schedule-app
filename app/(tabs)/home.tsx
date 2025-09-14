@@ -209,11 +209,36 @@ export default function HomeScreen() {
   ];
   
   // Show schedule selector modal
-  const showScheduleSelection = () => {
+  const showScheduleSelection = async () => {
+    console.log('Load button pressed - checking for schedules...');
+    console.log('Current schedules count:', schedules.length);
+    
+    // First try to refresh data to ensure we have the latest schedules
     if (schedules.length === 0) {
-      Alert.alert('No Schedules', 'No schedules found to load.');
+      console.log('No schedules in memory, refreshing data first...');
+      setIsRefreshing(true);
+      try {
+        await refreshAllData();
+        // Wait a moment for the data to propagate
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } finally {
+        setIsRefreshing(false);
+      }
+    }
+    
+    // Check again after refresh
+    const currentSchedules = schedules || [];
+    console.log('After refresh - schedules count:', currentSchedules.length);
+    
+    if (currentSchedules.length === 0) {
+      Alert.alert(
+        'No Schedules Found', 
+        'No previous schedules were found to load. Try creating a new schedule first, or use the Refresh button to check for existing data.',
+        [{ text: 'OK' }]
+      );
       return;
     }
+    
     setShowScheduleSelector(true);
   };
 
