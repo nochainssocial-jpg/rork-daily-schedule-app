@@ -34,6 +34,16 @@ export default function CreateScheduleScreen() {
   };
 
   const [workingStaff, setWorkingStaff] = useState<string[]>([]);
+  
+  // Auto-select "Everyone" when staff data is loaded and component is initialized
+  useEffect(() => {
+    if (isInitialized && staff.length > 0 && workingStaff.length === 0) {
+      const everyoneStaff = staff.find((s: Staff) => s.name === 'Everyone');
+      if (everyoneStaff) {
+        setWorkingStaff([everyoneStaff.id]);
+      }
+    }
+  }, [isInitialized, staff, workingStaff.length]);
   const [attendingParticipants, setAttendingParticipants] = useState<string[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
 
