@@ -39,6 +39,7 @@ export default function HomeScreen() {
   const [lastUpdateTime, setLastUpdateTime] = useState<string>('');
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [showScheduleSelector, setShowScheduleSelector] = useState<boolean>(false);
 
 
   useEffect(() => {
@@ -207,29 +208,27 @@ export default function HomeScreen() {
     { id: 'finalChecklist', title: 'Final Checklist', icon: ListChecks, color: '#E56B6F' },
   ];
   
-  // Load the most recently created schedule
-  const loadLastSchedule = async () => {
+  // Show schedule selector modal
+  const showScheduleSelection = () => {
     if (schedules.length === 0) {
       Alert.alert('No Schedules', 'No schedules found to load.');
       return;
     }
+    setShowScheduleSelector(true);
+  };
+
+  // Load selected schedule
+  const loadSelectedSchedule = async (scheduleToLoad: any) => {
+    setShowScheduleSelector(false);
     
-    // Find the most recently created schedule
-    const sortedSchedules = [...schedules].sort((a, b) => {
-      // Sort by date (most recent first)
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-    
-    const lastSchedule = sortedSchedules[0];
-    
-    if (lastSchedule.date === selectedDate) {
-      Alert.alert('Already Loaded', 'The most recent schedule is already loaded for today.');
+    if (scheduleToLoad.date === selectedDate) {
+      Alert.alert('Already Loaded', 'This schedule is already loaded for today.');
       return;
     }
     
-    // Create a copy of the last schedule for today's date
+    // Create a copy of the selected schedule for today's date
     const todaySchedule = {
-      ...lastSchedule,
+      ...scheduleToLoad,
       id: `schedule-${selectedDate}`,
       date: selectedDate
     };
@@ -241,13 +240,13 @@ export default function HomeScreen() {
       Alert.alert(
         'Schedule Loaded', 
         `Successfully loaded schedule from ${(() => {
-          const date = new Date(lastSchedule.date);
+          const date = new Date(scheduleToLoad.date);
           return `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()}`;
         })()} for today.`
       );
     } catch (error) {
-      console.error('Error loading last schedule:', error);
-      Alert.alert('Error', 'Failed to load the last schedule. Please try again.');
+      console.error('Error loading selected schedule:', error);
+      Alert.alert('Error', 'Failed to load the selected schedule. Please try again.');
     }
   };
 
@@ -384,9 +383,9 @@ export default function HomeScreen() {
             onCreatePress={handleCreatePress}
             onEditPress={handleEditPress}
             onSharePress={handleSharePress}
-            onLoadLastPress={loadLastSchedule}
+            onLoadLastPress={showScheduleSelection}
             onRefreshPress={handleRefreshPress}
-            hasSchedules={schedules.length > 0}
+            hasSchedules={schedules.length > 0 && !todaySchedule}
             isRefreshing={isRefreshing}
           />
         </View>
@@ -463,6 +462,48 @@ export default function HomeScreen() {
             </ScrollView>
           )}
         </View>
+        
+        {/* Schedule Selector Modal */}
+        {showScheduleSelector && (
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <Text style={styles.modalTitle}>Select Schedule to Load</Text>
+              <ScrollView style={styles.modalScrollView}>
+                {schedules
+                  .filter((schedule: any) => schedule.date !== selectedDate)
+                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                  .map((schedule: any) => {
+                    const scheduleDate = new Date(schedule.date);
+                    const formattedDate = `${scheduleDate.getDate().toString().padStart(2, '0')}/${(scheduleDate.getMonth() + 1).toString().padStart(2, '0')}/${scheduleDate.getFullYear()}`;
+                    const dayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][scheduleDate.getDay()];
+                    
+                    return (
+                      <TouchableOpacity
+                        key={schedule.id}
+                        style={styles.scheduleOption}
+                        onPress={() => loadSelectedSchedule(schedule)}
+                      >
+                        <View style={styles.scheduleOptionContent}>
+                          <Text style={styles.scheduleOptionDate}>{formattedDate}</Text>
+                          <Text style={styles.scheduleOptionDay}>{dayName}</Text>
+                        </View>
+                        <View style={styles.scheduleOptionStats}>
+                          <Text style={styles.scheduleOptionStat}>{schedule.workingStaff?.length || 0} staff</Text>
+                          <Text style={styles.scheduleOptionStat}>{schedule.attendingParticipants?.length || 0} participants</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </ScrollView>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setShowScheduleSelector(false)}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -613,5 +654,85 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    margin: 20,
+    maxHeight: '70%',
+    width: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold' as const,
+    color: '#333',
+    textAlign: 'center' as const,
+    marginBottom: 20,
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  scheduleOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    backgroundColor: '#fafafa',
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  scheduleOptionContent: {
+    flex: 1,
+  },
+  scheduleOptionDate: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#333',
+  },
+  scheduleOptionDay: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  scheduleOptionStats: {
+    alignItems: 'flex-end',
+  },
+  scheduleOptionStat: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 2,
+  },
+  modalCancelButton: {
+    backgroundColor: '#f44336',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });
