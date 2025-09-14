@@ -505,10 +505,10 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       workingStaffIds.includes(s.id) && !excludedNames.includes(s.name)
     );
     
-    // Filter out Antoinette before 2pm for initial slots
+    // Filter out Antoinette before 1:30pm (slot 8 is 1:30pm-2:00pm)
     const getAvailableStaffForSlot = (timeSlotId: string) => {
       const antoinette = availableStaff.find((s: Staff) => s.isTeamLeader);
-      if (antoinette && parseInt(timeSlotId) < 9) { // Before 2pm (slot 9 is 2:00pm-2:30pm)
+      if (antoinette && parseInt(timeSlotId) < 8) { // Before 1:30pm (slot 8 is 1:30pm-2:00pm)
         return availableStaff.filter((s: Staff) => s.id !== antoinette.id);
       }
       return availableStaff;
@@ -565,8 +565,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     const staff = staffQuery.data || [];
     const assignments: ChoreAssignment[] = [];
     
-    // Filter out 'Everyone', 'Drive/Outing', and 'Audit' from auto-assignments
-    const excludedNames = ['Everyone', 'Drive/Outing', 'Audit'];
+    // Filter out 'Everyone', 'Drive/Outing', 'Audit', and 'Antoinette' from auto-assignments
+    const excludedNames = ['Everyone', 'Drive/Outing', 'Audit', 'Antoinette'];
     const validStaffIds = workingStaffIds.filter(id => {
       const staffMember = staff.find((s: Staff) => s.id === id);
       return staffMember && !excludedNames.includes(staffMember.name);
