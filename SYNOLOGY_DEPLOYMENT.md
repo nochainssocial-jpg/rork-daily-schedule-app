@@ -3,12 +3,52 @@
 ## Prerequisites
 
 Your Synology NAS DS214Play needs:
-- Docker package installed from Package Center
 - SSH access enabled
-- Node.js 18+ (or use Docker method)
-- Bun runtime (or use Docker method)
+- Internet connection for downloading dependencies
+
+**Note:** Docker may not be available on DS214Play due to ARM architecture limitations. Use the Simple Installation method below if Docker is not available.
 
 ## Deployment Options
+
+### Option 0: Simple Installation (Recommended for DS214Play)
+
+**Use this method if Docker is not available on your NAS**
+
+1. **Upload your app to NAS:**
+   ```bash
+   # On your local machine, create a tar of your project
+   tar -czf daily-schedule-app.tar.gz .
+   
+   # Upload to NAS (replace YOUR_NAS_IP with actual IP)
+   scp daily-schedule-app.tar.gz admin@YOUR_NAS_IP:/volume1/
+   ```
+
+2. **SSH into your NAS and install:**
+   ```bash
+   ssh admin@YOUR_NAS_IP
+   cd /volume1
+   tar -xzf daily-schedule-app.tar.gz
+   cd daily-schedule-app
+   
+   # Make installer executable and run
+   chmod +x install-nas-simple.sh
+   sudo ./install-nas-simple.sh
+   ```
+
+3. **Start the application:**
+   ```bash
+   /volume1/web/daily-schedule-app/service.sh start
+   ```
+
+4. **Access your app:**
+   - Open browser and go to: `http://YOUR_NAS_IP:8081`
+
+**Management Commands:**
+- Start: `/volume1/web/daily-schedule-app/service.sh start`
+- Stop: `/volume1/web/daily-schedule-app/service.sh stop`
+- Restart: `/volume1/web/daily-schedule-app/service.sh restart`
+- Status: `/volume1/web/daily-schedule-app/service.sh status`
+- View logs: `/volume1/web/daily-schedule-app/service.sh logs`
 
 ### Option 1: Docker Deployment (Recommended)
 
