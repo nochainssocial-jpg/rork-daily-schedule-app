@@ -385,7 +385,7 @@ export default function HomeScreen() {
             onSharePress={handleSharePress}
             onLoadLastPress={showScheduleSelection}
             onRefreshPress={handleRefreshPress}
-            hasSchedules={schedules.length > 0 && !todaySchedule}
+            hasSchedules={schedules.length > 0}
             isRefreshing={isRefreshing}
           />
         </View>
