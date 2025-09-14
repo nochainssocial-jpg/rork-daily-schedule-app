@@ -218,7 +218,9 @@ export default function CreateScheduleScreen() {
       case 1:
         return (workingStaff.length / Math.max(staff.length, 1)) * 100;
       case 2:
-        return (attendingParticipants.length / Math.max(participants.length, 1)) * 100;
+        // Filter out "Everyone" from participants count for progress calculation
+        const validParticipantsCount = participants.filter((p: Participant) => p.name !== 'Everyone').length;
+        return (attendingParticipants.length / Math.max(validParticipantsCount, 1)) * 100;
       case 3:
         const assignedParticipants = assignments.flatMap(a => a.participantIds);
         return (assignedParticipants.length / attendingParticipants.length) * 100;
@@ -232,7 +234,9 @@ export default function CreateScheduleScreen() {
       case 1:
         return `${workingStaff.length} of ${staff.length} staff selected`;
       case 2:
-        return `${attendingParticipants.length} of ${participants.length} participants selected`;
+        // Filter out "Everyone" from participants count for progress text
+        const validParticipantsCount = participants.filter((p: Participant) => p.name !== 'Everyone').length;
+        return `${attendingParticipants.length} of ${validParticipantsCount} participants selected`;
       case 3:
         const assignedParticipants = assignments.flatMap(a => a.participantIds);
         return `${assignedParticipants.length} of ${attendingParticipants.length} participants assigned`;
@@ -286,9 +290,14 @@ export default function CreateScheduleScreen() {
         );
 
       case 2:
+        // Filter out "Everyone" from participants list as it's not a participant
+        const validParticipants = participants.filter((participant: Participant) => 
+          participant.name !== 'Everyone'
+        );
+        
         return (
           <View style={styles.selectionContainer}>
-            {participants.map((participant: Participant) => (
+            {validParticipants.map((participant: Participant) => (
               <TouchableOpacity
                 key={participant.id}
                 style={[
