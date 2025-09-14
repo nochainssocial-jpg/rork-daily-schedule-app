@@ -20,6 +20,6 @@ bun install
 
 # Start the application
 echo "Starting app on port 8081..."
-bun run start-nas
+bunx rork start -p r0zofc8p3enybeuldw19k --web --host 0.0.0.0 --port 8081
 
 echo "App should be available at http://YOUR_NAS_IP:8081"
