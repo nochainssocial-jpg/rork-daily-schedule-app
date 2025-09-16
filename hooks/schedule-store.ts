@@ -493,7 +493,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   });
 
   // Helper functions
-  const generateTimeSlotAssignments = (workingStaffIds: string[]): {
+  const generateTimeSlotAssignments = (workingStaffIds: string[], attendingParticipantIds?: string[]): {
     frontRoom: TimeSlotAssignment[];
     scotty: TimeSlotAssignment[];
     twins: TimeSlotAssignment[];
@@ -508,9 +508,15 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     );
     
     // Check if twins (Zara and Zoya) are attending
+    // Use attendingParticipantIds if provided (for existing schedules), otherwise check workingStaffIds
+    const checkIds = attendingParticipantIds || workingStaffIds;
     const zara = participants.find((p: Participant) => p.name === 'Zara');
     const zoya = participants.find((p: Participant) => p.name === 'Zoya');
-    const twinsAttending = (zara && workingStaffIds.includes(zara.id)) || (zoya && workingStaffIds.includes(zoya.id));
+    const twinsAttending = (zara && checkIds.includes(zara.id)) || (zoya && checkIds.includes(zoya.id));
+    
+    // Check if Scott is attending
+    const scott = participants.find((p: Participant) => p.name === 'Scott');
+    const scottAttending = scott && checkIds.includes(scott.id);
     
     // Filter out Antoinette before 1:30pm (slot 8 is 1:30pm-2:00pm)
     const getAvailableStaffForSlot = (timeSlotId: string) => {
@@ -587,6 +593,11 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         return null;
       }
       
+      // Skip scotty assignments if Scott is not attending
+      if (category === 'scotty' && !scottAttending) {
+        return null;
+      }
+      
       const availableForSlot = getAvailableStaffForSlot(timeSlotId);
       const selectedStaff = selectStaffForSlot(availableForSlot, timeSlotId);
       
@@ -620,7 +631,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         frontRoom.push({ timeSlotId: slot.id, staffId: frontRoomStaffId });
       }
 
-      // Assign to Scotty
+      // Assign to Scotty (only if Scott is attending)
       const scottyStaffId = assignStaffToSlot('scotty', slot.id);
       if (scottyStaffId) {
         scotty.push({ timeSlotId: slot.id, staffId: scottyStaffId });
@@ -634,6 +645,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     });
 
     console.log('Time slot assignments generated:');
+    console.log('Scott attending:', scottAttending);
     console.log('Twins attending:', twinsAttending);
     console.log('Staff assignment distribution:', staffAssignmentCount);
     console.log('Front Room slots:', frontRoom.length);
@@ -826,7 +838,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     console.log('Working staff:', workingStaff.length);
     console.log('Attending participants:', attendingParticipants.length);
     
-    const timeSlotAssignments = generateTimeSlotAssignments(workingStaff);
+    const timeSlotAssignments = generateTimeSlotAssignments(workingStaff, attendingParticipants);
     const choreAssignments = await generateChoreAssignments(workingStaff);
 
     const schedule: Schedule = {
@@ -903,7 +915,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     const schedules = schedulesQuery.data || [];
     const schedule = schedules.find((s: Schedule) => s.id === scheduleId);
     if (schedule) {
-      const timeSlotAssignments = generateTimeSlotAssignments(schedule.workingStaff);
+      // Pass attendingParticipants to properly check for twins attendance
+      const timeSlotAssignments = generateTimeSlotAssignments(schedule.workingStaff, schedule.attendingParticipants);
       const choreAssignments = await generateChoreAssignments(schedule.workingStaff, forceChoreRegeneration);
       
       const updatedSchedule: Schedule = {

@@ -227,6 +227,22 @@ export default function EditScheduleScreen() {
     if (!schedule) return;
     
     try {
+      // For twins and scotty, ensure we have the latest participant list
+      // This handles cases where participants were added after schedule creation
+      if (category === 'twins' || category === 'scotty') {
+        // Get the current schedule to ensure we have the latest data
+        const currentSchedule = getScheduleForDate(selectedDate);
+        if (currentSchedule) {
+          // Update the schedule with current attending participants before regenerating
+          const updatedScheduleData = {
+            ...currentSchedule,
+            attendingParticipants: currentSchedule.attendingParticipants || []
+          };
+          // Save the updated participant list first
+          await updateCategory('participants', updatedScheduleData);
+        }
+      }
+      
       await regenerateAssignments(schedule.id, false);
       // Refresh the data to show new assignments
       const updatedSchedule = getScheduleForDate(selectedDate);
@@ -485,13 +501,30 @@ export default function EditScheduleScreen() {
     const attendingParticipants = participants.filter((p: Participant) => attendingParticipantIds.includes(p.id));
     const twinsAttending = attendingParticipants.some((p: Participant) => p.name === 'Zara' || p.name === 'Zoya');
     
-    // If this is twins slot and no twins are attending, show message
+    // Check if Scott is attending for scotty slot type
+    const scottAttending = attendingParticipants.some((p: Participant) => p.name === 'Scott');
+    
+    // If this is twins slot and no twins are attending, show message with helpful hint
     if (slotType === 'twins' && !twinsAttending) {
       return (
         <View style={styles.listContainer}>
           <View style={styles.noTwinsMessage}>
             <Text style={styles.noTwinsTitle}>Twins Time Slot Omitted</Text>
             <Text style={styles.noTwinsText}>Neither Zara nor Zoya are attending today, so the twins time slot has been omitted.</Text>
+            <Text style={styles.noTwinsHint}>If you've added Zara or Zoya to participants, go to the Participants section and ensure they are marked as attending, then return here and use the Options button to auto-assign.</Text>
+          </View>
+        </View>
+      );
+    }
+    
+    // If this is scotty slot and Scott is not attending, show message with helpful hint
+    if (slotType === 'scotty' && !scottAttending) {
+      return (
+        <View style={styles.listContainer}>
+          <View style={styles.noTwinsMessage}>
+            <Text style={styles.noTwinsTitle}>Scott Time Slot Omitted</Text>
+            <Text style={styles.noTwinsText}>Scott is not attending today, so the Scott time slot has been omitted.</Text>
+            <Text style={styles.noTwinsHint}>If you've added Scott to participants, go to the Participants section and ensure he is marked as attending, then return here and use the Options button to auto-assign.</Text>
           </View>
         </View>
       );
@@ -1506,5 +1539,13 @@ const styles = StyleSheet.create({
     color: '#856404',
     textAlign: 'center' as const,
     lineHeight: 20,
+  },
+  noTwinsHint: {
+    fontSize: 12,
+    color: '#2196F3',
+    textAlign: 'center' as const,
+    marginTop: 12,
+    paddingHorizontal: 20,
+    fontStyle: 'italic' as const,
   },
 });
