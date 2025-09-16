@@ -30,7 +30,8 @@ export default function EditScheduleScreen() {
     schedules,
     updateCategory,
     autoReassignChores,
-    getWeeklyChoreDistribution
+    getWeeklyChoreDistribution,
+    regenerateAssignments
   } = useSchedule();
   
   const [schedule, setSchedule] = useState<Schedule | null>(null);
@@ -38,6 +39,7 @@ export default function EditScheduleScreen() {
   const [selectedStaffForDropOff, setSelectedStaffForDropOff] = useState<string | null>(null);
   const [weeklyDistribution, setWeeklyDistribution] = useState<{ [staffId: string]: number }>({});
   const [showReassignOptions, setShowReassignOptions] = useState<boolean>(false);
+  const [showTimeSlotOptions, setShowTimeSlotOptions] = useState<boolean>(false);
 
   const initializeEditData = useCallback((currentSchedule: Schedule) => {
     if (!category) return;
@@ -194,6 +196,57 @@ export default function EditScheduleScreen() {
     } catch (error) {
       console.error('Error saving changes:', error);
       Alert.alert('Error', 'Failed to save changes. Please try again.');
+    }
+  };
+
+  // Time slot options handlers
+  const handleShowTimeSlotOptions = () => {
+    setShowTimeSlotOptions(!showTimeSlotOptions);
+  };
+
+  const handleAutoReassignTimeSlots = async (slotType: string) => {
+    if (!schedule) return;
+    
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Auto-reassign all ${slotType === 'frontRoom' ? 'Front Room' : slotType === 'scotty' ? 'Scotty' : 'Twins'} time slots? This will redistribute assignments with better randomization.`)) {
+        await performTimeSlotReassign();
+      }
+    } else {
+      Alert.alert(
+        `Auto-Reassign ${slotType === 'frontRoom' ? 'Front Room' : slotType === 'scotty' ? 'Scotty' : 'Twins'} Slots`,
+        'This will redistribute all time slot assignments using improved randomization for better staff distribution. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Reassign', onPress: performTimeSlotReassign }
+        ]
+      );
+    }
+  };
+
+  const performTimeSlotReassign = async () => {
+    if (!schedule) return;
+    
+    try {
+      await regenerateAssignments(schedule.id, false);
+      // Refresh the data to show new assignments
+      const updatedSchedule = getScheduleForDate(selectedDate);
+      if (updatedSchedule) {
+        switch (category) {
+          case 'frontRoom':
+            setEditedData(updatedSchedule.frontRoomSlots);
+            break;
+          case 'scotty':
+            setEditedData(updatedSchedule.scottySlots);
+            break;
+          case 'twins':
+            setEditedData(updatedSchedule.twinsSlots);
+            break;
+        }
+      }
+      Alert.alert('Success', 'Time slots have been reassigned with improved randomization!');
+    } catch (error) {
+      console.error('Error auto-reassigning time slots:', error);
+      Alert.alert('Error', 'Failed to reassign time slots. Please try again.');
     }
   };
 
@@ -446,12 +499,56 @@ export default function EditScheduleScreen() {
     
     return (
       <View style={styles.listContainer}>
+        {/* Time Slot Options Header */}
         <View style={styles.timeSlotHeader}>
-          <Text style={styles.timeSlotHeaderTitle}>
-            {slotType === 'frontRoom' ? 'Front Room Schedule' : 
-             slotType === 'scotty' ? 'Scotty Schedule' : 'Twins Schedule'}
-          </Text>
+          <View style={styles.timeSlotHeaderTop}>
+            <Text style={styles.timeSlotHeaderTitle}>
+              {slotType === 'frontRoom' ? 'Front Room Schedule' : 
+               slotType === 'scotty' ? 'Scotty Schedule' : 'Twins Schedule'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.reassignButton}
+              onPress={handleShowTimeSlotOptions}
+              activeOpacity={0.7}
+            >
+              <Shuffle size={16} color="#007AFF" />
+              <Text style={styles.reassignButtonText}>Options</Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.timeSlotHeaderSubtitle}>Randomized staff assignments with better distribution</Text>
+          
+          {showTimeSlotOptions && (
+            <View style={styles.reassignOptions}>
+              <TouchableOpacity 
+                style={styles.reassignOptionButton}
+                onPress={() => handleAutoReassignTimeSlots(slotType)}
+                activeOpacity={0.7}
+              >
+                <RotateCcw size={16} color="#4CAF50" />
+                <Text style={styles.reassignOptionText}>Auto Re-assign All</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.weeklyStatsContainer}>
+                <View style={styles.weeklyStatsHeader}>
+                  <Users size={14} color="#666" />
+                  <Text style={styles.weeklyStatsTitle}>Current Assignments</Text>
+                </View>
+                <View style={styles.weeklyStatsList}>
+                  {slots.map((slot) => {
+                    const timeSlot = timeSlots.find(ts => ts.id === slot.timeSlotId);
+                    const assignedStaff = staff.find((s: Staff) => s.id === slot.staffId);
+                    return (
+                      <View key={slot.timeSlotId} style={styles.weeklyStatsItem}>
+                        <View style={[styles.colorDot, { backgroundColor: assignedStaff?.color || '#666' }]} />
+                        <Text style={styles.weeklyStatsName}>{timeSlot?.displayTime}</Text>
+                        <Text style={styles.weeklyStatsCount}>{assignedStaff?.name || 'Unassigned'}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            </View>
+          )}
         </View>
         {timeSlots.map((timeSlot) => {
           const assignment = slots.find((s: TimeSlotAssignment) => s.timeSlotId === timeSlot.id);
@@ -897,7 +994,7 @@ export default function EditScheduleScreen() {
         options={{ 
           title: getCategoryTitle(),
           headerRight: () => (
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={styles.headerRightContainer}>
               <TouchableOpacity onPress={handleCancel} style={styles.cancelButton}>
                 <X size={24} color="#FF3B30" />
               </TouchableOpacity>
@@ -919,6 +1016,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
+  },
+  headerRightContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   saveButton: {
     marginRight: 10,
@@ -1367,15 +1468,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  timeSlotHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   timeSlotHeaderTitle: {
     fontSize: 18,
     fontWeight: '600' as const,
     color: '#333',
-    marginBottom: 4,
   },
   timeSlotHeaderSubtitle: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 8,
   },
   // No twins message styles
   noTwinsMessage: {
