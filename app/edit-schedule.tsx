@@ -301,9 +301,22 @@ export default function EditScheduleScreen() {
   const renderAssignments = () => {
     const assignments = schedule?.assignments || [];
     
+    // Sort assignments alphabetically by staff name
+    const sortedAssignments = [...assignments].sort((a, b) => {
+      const staffA = staff.find((s: Staff) => s.id === a.staffId);
+      const staffB = staff.find((s: Staff) => s.id === b.staffId);
+      const nameA = staffA?.name || '';
+      const nameB = staffB?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+    
     return (
       <View style={styles.listContainer}>
-        {assignments.map((assignment, index) => {
+        <View style={styles.assignmentHeader}>
+          <Text style={styles.assignmentHeaderTitle}>Daily Assignments (Alphabetical)</Text>
+          <Text style={styles.assignmentHeaderSubtitle}>Staff names sorted alphabetically</Text>
+        </View>
+        {sortedAssignments.map((assignment, index) => {
           const staffMember = staff.find((s: Staff) => s.id === assignment.staffId);
           const assignedParticipants = assignment.participantIds.map((pId: string) => 
             participants.find((p: Participant) => p.id === pId)?.name
@@ -343,9 +356,12 @@ export default function EditScheduleScreen() {
       const workingStaffIds = schedule?.workingStaff || [];
       // Filter out 'Everyone', 'Drive/Outing', and 'Audit' from assignments
       const excludedNames = ['Everyone', 'Drive/Outing', 'Audit'];
-      const workingStaff = staff.filter((s: Staff) => 
+      let workingStaff = staff.filter((s: Staff) => 
         workingStaffIds.includes(s.id) && !excludedNames.includes(s.name)
       );
+      
+      // Sort staff alphabetically for better randomization in selection
+      workingStaff = workingStaff.sort((a, b) => a.name.localeCompare(b.name));
       
       if (workingStaff.length === 0) {
         Alert.alert('No Staff', 'No working staff available for assignment');
@@ -411,8 +427,32 @@ export default function EditScheduleScreen() {
       }
     };
 
+    // Check if twins are attending for twins slot type
+    const attendingParticipantIds = schedule?.attendingParticipants || [];
+    const attendingParticipants = participants.filter((p: Participant) => attendingParticipantIds.includes(p.id));
+    const twinsAttending = attendingParticipants.some((p: Participant) => p.name === 'Zara' || p.name === 'Zoya');
+    
+    // If this is twins slot and no twins are attending, show message
+    if (slotType === 'twins' && !twinsAttending) {
+      return (
+        <View style={styles.listContainer}>
+          <View style={styles.noTwinsMessage}>
+            <Text style={styles.noTwinsTitle}>Twins Time Slot Omitted</Text>
+            <Text style={styles.noTwinsText}>Neither Zara nor Zoya are attending today, so the twins time slot has been omitted.</Text>
+          </View>
+        </View>
+      );
+    }
+    
     return (
       <View style={styles.listContainer}>
+        <View style={styles.timeSlotHeader}>
+          <Text style={styles.timeSlotHeaderTitle}>
+            {slotType === 'frontRoom' ? 'Front Room Schedule' : 
+             slotType === 'scotty' ? 'Scotty Schedule' : 'Twins Schedule'}
+          </Text>
+          <Text style={styles.timeSlotHeaderSubtitle}>Randomized staff assignments with better distribution</Text>
+        </View>
         {timeSlots.map((timeSlot) => {
           const assignment = slots.find((s: TimeSlotAssignment) => s.timeSlotId === timeSlot.id);
           const assignedStaff = assignment ? staff.find((s: Staff) => s.id === assignment.staffId) : null;
@@ -1302,5 +1342,62 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
+  },
+  // Assignment header styles
+  assignmentHeader: {
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  assignmentHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#333',
+    marginBottom: 4,
+  },
+  assignmentHeaderSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  // Time slot header styles
+  timeSlotHeader: {
+    backgroundColor: '#f8f8f8',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  timeSlotHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#333',
+    marginBottom: 4,
+  },
+  timeSlotHeaderSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  // No twins message styles
+  noTwinsMessage: {
+    padding: 30,
+    alignItems: 'center',
+    backgroundColor: '#fff3cd',
+    margin: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  noTwinsTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#856404',
+    marginBottom: 8,
+    textAlign: 'center' as const,
+  },
+  noTwinsText: {
+    fontSize: 14,
+    color: '#856404',
+    textAlign: 'center' as const,
+    lineHeight: 20,
   },
 });

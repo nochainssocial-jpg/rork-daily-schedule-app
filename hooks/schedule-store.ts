@@ -499,11 +499,18 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     twins: TimeSlotAssignment[];
   } => {
     const staff = staffQuery.data || [];
+    const participants = participantsQuery.data || [];
+    
     // Filter out 'Everyone', 'Drive/Outing', and 'Audit' from auto-assignments
     const excludedNames = ['Everyone', 'Drive/Outing', 'Audit'];
     const availableStaff = staff.filter((s: Staff) => 
       workingStaffIds.includes(s.id) && !excludedNames.includes(s.name)
     );
+    
+    // Check if twins (Zara and Zoya) are attending
+    const zara = participants.find((p: Participant) => p.name === 'Zara');
+    const zoya = participants.find((p: Participant) => p.name === 'Zoya');
+    const twinsAttending = (zara && workingStaffIds.includes(zara.id)) || (zoya && workingStaffIds.includes(zoya.id));
     
     // Filter out Antoinette before 1:30pm (slot 8 is 1:30pm-2:00pm)
     const getAvailableStaffForSlot = (timeSlotId: string) => {
@@ -518,12 +525,14 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     const scotty: TimeSlotAssignment[] = [];
     const twins: TimeSlotAssignment[] = [];
 
-    // Track staff assignments across all slots and categories
+    // Track staff assignments across all slots and categories for better distribution
+    const staffAssignmentCount: { [staffId: string]: number } = {};
     const staffAssignments: { [staffId: string]: string[] } = {}; // staffId -> [timeSlotIds]
     const usedStaffPerSlot: { [key: string]: string[] } = {}; // timeSlotId -> [staffIds]
 
     // Initialize tracking
     availableStaff.forEach(staff => {
+      staffAssignmentCount[staff.id] = 0;
       staffAssignments[staff.id] = [];
     });
 
@@ -550,10 +559,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       return true;
     };
 
-    // Helper function to assign staff to a category for a time slot
-    const assignStaffToSlot = (category: 'frontRoom' | 'scotty' | 'twins', timeSlotId: string): string | null => {
-      const availableForSlot = getAvailableStaffForSlot(timeSlotId);
-      
+    // Enhanced staff selection with better randomization and distribution
+    const selectStaffForSlot = (availableForSlot: Staff[], timeSlotId: string): Staff | null => {
       // Filter staff that can be assigned to this slot
       const eligibleStaff = availableForSlot.filter((s: Staff) => 
         canAssignStaff(s.id, timeSlotId) && 
@@ -564,21 +571,42 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         return null;
       }
       
-      // Randomize selection for better distribution
-      const randomStaff = eligibleStaff[Math.floor(Math.random() * eligibleStaff.length)];
+      // Prioritize staff with fewer assignments for better distribution
+      const minAssignments = Math.min(...eligibleStaff.map(s => staffAssignmentCount[s.id]));
+      const leastAssignedStaff = eligibleStaff.filter(s => staffAssignmentCount[s.id] === minAssignments);
+      
+      // Randomize selection from least assigned staff
+      const randomIndex = Math.floor(Math.random() * leastAssignedStaff.length);
+      return leastAssignedStaff[randomIndex];
+    };
+
+    // Helper function to assign staff to a category for a time slot
+    const assignStaffToSlot = (category: 'frontRoom' | 'scotty' | 'twins', timeSlotId: string): string | null => {
+      // Skip twins assignments if neither Zara nor Zoya are attending
+      if (category === 'twins' && !twinsAttending) {
+        return null;
+      }
+      
+      const availableForSlot = getAvailableStaffForSlot(timeSlotId);
+      const selectedStaff = selectStaffForSlot(availableForSlot, timeSlotId);
+      
+      if (!selectedStaff) {
+        return null;
+      }
       
       // Track the assignment
-      if (!staffAssignments[randomStaff.id]) {
-        staffAssignments[randomStaff.id] = [];
+      staffAssignmentCount[selectedStaff.id]++;
+      if (!staffAssignments[selectedStaff.id]) {
+        staffAssignments[selectedStaff.id] = [];
       }
-      staffAssignments[randomStaff.id].push(timeSlotId);
+      staffAssignments[selectedStaff.id].push(timeSlotId);
       
       if (!usedStaffPerSlot[timeSlotId]) {
         usedStaffPerSlot[timeSlotId] = [];
       }
-      usedStaffPerSlot[timeSlotId].push(randomStaff.id);
+      usedStaffPerSlot[timeSlotId].push(selectedStaff.id);
       
-      return randomStaff.id;
+      return selectedStaff.id;
     };
 
     // Assign staff to all time slots for all categories
@@ -598,7 +626,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
         scotty.push({ timeSlotId: slot.id, staffId: scottyStaffId });
       }
 
-      // Assign to Twins
+      // Assign to Twins (only if twins are attending)
       const twinsStaffId = assignStaffToSlot('twins', slot.id);
       if (twinsStaffId) {
         twins.push({ timeSlotId: slot.id, staffId: twinsStaffId });
@@ -606,7 +634,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     });
 
     console.log('Time slot assignments generated:');
-    console.log('Staff assignments summary:', staffAssignments);
+    console.log('Twins attending:', twinsAttending);
+    console.log('Staff assignment distribution:', staffAssignmentCount);
     console.log('Front Room slots:', frontRoom.length);
     console.log('Scotty slots:', scotty.length);
     console.log('Twins slots:', twins.length);
