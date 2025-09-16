@@ -390,10 +390,18 @@ export default function ViewPDFScreen() {
           
           {/* Table Header */}
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, styles.timeColumn]}>Time</Text>
-            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Front Room</Text>
-            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Scott</Text>
-            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Twins</Text>
+            <View style={styles.timeColumn}>
+              <Text style={styles.tableHeaderCell}>Time</Text>
+            </View>
+            <View style={styles.staffColumn}>
+              <Text style={styles.tableHeaderCell}>Front Room</Text>
+            </View>
+            <View style={styles.staffColumn}>
+              <Text style={styles.tableHeaderCell}>Scott</Text>
+            </View>
+            <View style={styles.staffColumn}>
+              <Text style={styles.tableHeaderCell}>Twins</Text>
+            </View>
           </View>
           
           {/* Table Rows */}
@@ -887,7 +895,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     paddingHorizontal: 4,
-    textAlign: 'center',
+    textAlign: 'center' as const,
   },
   tableRow: {
     flexDirection: 'row',
