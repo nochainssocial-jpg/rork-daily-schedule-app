@@ -887,6 +887,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
     paddingHorizontal: 4,
+    textAlign: 'center',
   },
   tableRow: {
     flexDirection: 'row',
