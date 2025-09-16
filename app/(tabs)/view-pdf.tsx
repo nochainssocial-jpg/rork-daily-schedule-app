@@ -1,15 +1,18 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Share as RNShare, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Share as RNShare, Modal, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import type { Staff, Participant, Chore, TimeSlot, DropOffAssignment, PickupAssignment } from '@/types/schedule';
-import { RefreshCw, AlertCircle, FileText, Edit2, Check, X } from 'lucide-react-native';
+import { RefreshCw, AlertCircle, FileText, UserPlus, X } from 'lucide-react-native';
 
 export default function ViewPDFScreen() {
   const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion, updateScheduleImmediately } = useSchedule();
   const [refreshing, setRefreshing] = useState(false);
-  const [editingSlot, setEditingSlot] = useState<{ type: 'frontRoom' | 'scotty' | 'twins'; timeSlotId: string } | null>(null);
-  const [editValue, setEditValue] = useState('');
+  const [reassignModal, setReassignModal] = useState<{ 
+    type: 'frontRoom' | 'scotty' | 'twins'; 
+    timeSlotId: string;
+    currentStaffId?: string;
+  } | null>(null);
   const insets = useSafeAreaInsets();
   
   const schedule = getScheduleForDate(selectedDate);
@@ -410,184 +413,66 @@ export default function ViewPDFScreen() {
             const scottySlot = schedule.scottySlots.find(s => s.timeSlotId === timeSlot.id);
             const twinsSlot = schedule.twinsSlots.find(s => s.timeSlotId === timeSlot.id);
             
-            const isEditingFrontRoom = editingSlot?.type === 'frontRoom' && editingSlot?.timeSlotId === timeSlot.id;
-            const isEditingScotty = editingSlot?.type === 'scotty' && editingSlot?.timeSlotId === timeSlot.id;
-            const isEditingTwins = editingSlot?.type === 'twins' && editingSlot?.timeSlotId === timeSlot.id;
-            
             return (
               <View key={timeSlot.id} style={styles.tableRow}>
                 <Text style={[styles.tableCell, styles.timeColumn]}>{timeSlot.displayTime}</Text>
                 
                 {/* Front Room Cell */}
-                <View style={[styles.tableCell, styles.staffColumn]}>
-                  {isEditingFrontRoom ? (
-                    <View style={styles.editContainer}>
-                      <TextInput
-                        style={styles.editInput}
-                        value={editValue}
-                        onChangeText={setEditValue}
-                        placeholder="Staff name"
-                        autoFocus
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
-                          if (staffMember) {
-                            const updatedSchedule = { ...schedule };
-                            const slotIndex = updatedSchedule.frontRoomSlots.findIndex(s => s.timeSlotId === timeSlot.id);
-                            if (slotIndex >= 0) {
-                              updatedSchedule.frontRoomSlots[slotIndex].staffId = staffMember.id;
-                            } else {
-                              updatedSchedule.frontRoomSlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
-                            }
-                            updateScheduleImmediately(updatedSchedule);
-                          }
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <Check size={16} color="#4CAF50" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <X size={16} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.editableCell}
-                      onPress={() => {
-                        setEditingSlot({ type: 'frontRoom', timeSlotId: timeSlot.id });
-                        setEditValue(frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '');
-                      }}
-                    >
-                      <Text style={styles.staffName}>
-                        {frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '-'}
-                      </Text>
-                      <Edit2 size={14} color="#999" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={[styles.tableCell, styles.staffColumn]}
+                  onPress={() => {
+                    setReassignModal({ 
+                      type: 'frontRoom', 
+                      timeSlotId: timeSlot.id,
+                      currentStaffId: frontRoomSlot?.staffId
+                    });
+                  }}
+                >
+                  <View style={styles.reassignableCell}>
+                    <Text style={styles.staffName}>
+                      {frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '-'}
+                    </Text>
+                    <UserPlus size={14} color="#007AFF" />
+                  </View>
+                </TouchableOpacity>
                 
                 {/* Scott Cell */}
-                <View style={[styles.tableCell, styles.staffColumn]}>
-                  {isEditingScotty ? (
-                    <View style={styles.editContainer}>
-                      <TextInput
-                        style={styles.editInput}
-                        value={editValue}
-                        onChangeText={setEditValue}
-                        placeholder="Staff name"
-                        autoFocus
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
-                          if (staffMember) {
-                            const updatedSchedule = { ...schedule };
-                            const slotIndex = updatedSchedule.scottySlots.findIndex(s => s.timeSlotId === timeSlot.id);
-                            if (slotIndex >= 0) {
-                              updatedSchedule.scottySlots[slotIndex].staffId = staffMember.id;
-                            } else {
-                              updatedSchedule.scottySlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
-                            }
-                            updateScheduleImmediately(updatedSchedule);
-                          }
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <Check size={16} color="#4CAF50" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <X size={16} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.editableCell}
-                      onPress={() => {
-                        setEditingSlot({ type: 'scotty', timeSlotId: timeSlot.id });
-                        setEditValue(scottySlot ? getStaffName(scottySlot.staffId) : '');
-                      }}
-                    >
-                      <Text style={styles.staffName}>
-                        {scottySlot ? getStaffName(scottySlot.staffId) : '-'}
-                      </Text>
-                      <Edit2 size={14} color="#999" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={[styles.tableCell, styles.staffColumn]}
+                  onPress={() => {
+                    setReassignModal({ 
+                      type: 'scotty', 
+                      timeSlotId: timeSlot.id,
+                      currentStaffId: scottySlot?.staffId
+                    });
+                  }}
+                >
+                  <View style={styles.reassignableCell}>
+                    <Text style={styles.staffName}>
+                      {scottySlot ? getStaffName(scottySlot.staffId) : '-'}
+                    </Text>
+                    <UserPlus size={14} color="#007AFF" />
+                  </View>
+                </TouchableOpacity>
                 
                 {/* Twins Cell */}
-                <View style={[styles.tableCell, styles.staffColumn]}>
-                  {isEditingTwins ? (
-                    <View style={styles.editContainer}>
-                      <TextInput
-                        style={styles.editInput}
-                        value={editValue}
-                        onChangeText={setEditValue}
-                        placeholder="Staff name"
-                        autoFocus
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
-                          if (staffMember) {
-                            const updatedSchedule = { ...schedule };
-                            const slotIndex = updatedSchedule.twinsSlots.findIndex(s => s.timeSlotId === timeSlot.id);
-                            if (slotIndex >= 0) {
-                              updatedSchedule.twinsSlots[slotIndex].staffId = staffMember.id;
-                            } else {
-                              updatedSchedule.twinsSlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
-                            }
-                            updateScheduleImmediately(updatedSchedule);
-                          }
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <Check size={16} color="#4CAF50" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setEditingSlot(null);
-                          setEditValue('');
-                        }}
-                        style={styles.editButton}
-                      >
-                        <X size={16} color="#FF6B6B" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.editableCell}
-                      onPress={() => {
-                        setEditingSlot({ type: 'twins', timeSlotId: timeSlot.id });
-                        setEditValue(twinsSlot ? getStaffName(twinsSlot.staffId) : '');
-                      }}
-                    >
-                      <Text style={styles.staffName}>
-                        {twinsSlot ? getStaffName(twinsSlot.staffId) : '-'}
-                      </Text>
-                      <Edit2 size={14} color="#999" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={[styles.tableCell, styles.staffColumn]}
+                  onPress={() => {
+                    setReassignModal({ 
+                      type: 'twins', 
+                      timeSlotId: timeSlot.id,
+                      currentStaffId: twinsSlot?.staffId
+                    });
+                  }}
+                >
+                  <View style={styles.reassignableCell}>
+                    <Text style={styles.staffName}>
+                      {twinsSlot ? getStaffName(twinsSlot.staffId) : '-'}
+                    </Text>
+                    <UserPlus size={14} color="#007AFF" />
+                  </View>
+                </TouchableOpacity>
               </View>
             );
           })}
@@ -650,6 +535,143 @@ export default function ViewPDFScreen() {
           Assigned to: {getStaffName(schedule.finalChecklistStaff)}
         </Text>
       </View>
+
+      {/* Reassign Modal */}
+      <Modal
+        visible={reassignModal !== null}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setReassignModal(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                Re-assign {reassignModal?.type === 'frontRoom' ? 'Front Room' : 
+                          reassignModal?.type === 'scotty' ? 'Scott' : 'Twins'} Slot
+              </Text>
+              <TouchableOpacity
+                onPress={() => setReassignModal(null)}
+                style={styles.modalCloseButton}
+              >
+                <X size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            {reassignModal && (
+              <>
+                <Text style={styles.modalSubtitle}>
+                  Time: {getTimeSlotDisplay(reassignModal.timeSlotId)}
+                </Text>
+                <Text style={styles.modalCurrentStaff}>
+                  Currently assigned: {reassignModal.currentStaffId ? getStaffName(reassignModal.currentStaffId) : 'None'}
+                </Text>
+                
+                <View style={styles.modalDivider} />
+                
+                <Text style={styles.modalSectionTitle}>Select Staff Member:</Text>
+                
+                <FlatList
+                  data={schedule.workingStaff}
+                  keyExtractor={(item) => item}
+                  style={styles.staffList}
+                  renderItem={({ item: staffId }) => {
+                    const isCurrentlyAssigned = staffId === reassignModal.currentStaffId;
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.staffOption,
+                          isCurrentlyAssigned && styles.staffOptionSelected
+                        ]}
+                        onPress={() => {
+                          const updatedSchedule = { ...schedule };
+                          
+                          if (reassignModal.type === 'frontRoom') {
+                            const slotIndex = updatedSchedule.frontRoomSlots.findIndex(
+                              s => s.timeSlotId === reassignModal.timeSlotId
+                            );
+                            if (slotIndex >= 0) {
+                              updatedSchedule.frontRoomSlots[slotIndex].staffId = staffId;
+                            } else {
+                              updatedSchedule.frontRoomSlots.push({ 
+                                timeSlotId: reassignModal.timeSlotId, 
+                                staffId 
+                              });
+                            }
+                          } else if (reassignModal.type === 'scotty') {
+                            const slotIndex = updatedSchedule.scottySlots.findIndex(
+                              s => s.timeSlotId === reassignModal.timeSlotId
+                            );
+                            if (slotIndex >= 0) {
+                              updatedSchedule.scottySlots[slotIndex].staffId = staffId;
+                            } else {
+                              updatedSchedule.scottySlots.push({ 
+                                timeSlotId: reassignModal.timeSlotId, 
+                                staffId 
+                              });
+                            }
+                          } else if (reassignModal.type === 'twins') {
+                            const slotIndex = updatedSchedule.twinsSlots.findIndex(
+                              s => s.timeSlotId === reassignModal.timeSlotId
+                            );
+                            if (slotIndex >= 0) {
+                              updatedSchedule.twinsSlots[slotIndex].staffId = staffId;
+                            } else {
+                              updatedSchedule.twinsSlots.push({ 
+                                timeSlotId: reassignModal.timeSlotId, 
+                                staffId 
+                              });
+                            }
+                          }
+                          
+                          updateScheduleImmediately(updatedSchedule);
+                          setReassignModal(null);
+                        }}
+                      >
+                        <Text style={[
+                          styles.staffOptionText,
+                          isCurrentlyAssigned && styles.staffOptionTextSelected
+                        ]}>
+                          {getStaffName(staffId)}
+                        </Text>
+                        {isCurrentlyAssigned && (
+                          <Text style={styles.currentBadge}>Current</Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  }}
+                />
+                
+                <TouchableOpacity
+                  style={styles.clearButton}
+                  onPress={() => {
+                    const updatedSchedule = { ...schedule };
+                    
+                    if (reassignModal.type === 'frontRoom') {
+                      updatedSchedule.frontRoomSlots = updatedSchedule.frontRoomSlots.filter(
+                        s => s.timeSlotId !== reassignModal.timeSlotId
+                      );
+                    } else if (reassignModal.type === 'scotty') {
+                      updatedSchedule.scottySlots = updatedSchedule.scottySlots.filter(
+                        s => s.timeSlotId !== reassignModal.timeSlotId
+                      );
+                    } else if (reassignModal.type === 'twins') {
+                      updatedSchedule.twinsSlots = updatedSchedule.twinsSlots.filter(
+                        s => s.timeSlotId !== reassignModal.timeSlotId
+                      );
+                    }
+                    
+                    updateScheduleImmediately(updatedSchedule);
+                    setReassignModal(null);
+                  }}
+                >
+                  <Text style={styles.clearButtonText}>Clear Assignment</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -917,7 +939,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 90,
   },
-  editableCell: {
+  reassignableCell: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -932,23 +954,102 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     flex: 1,
   },
-  editContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  editInput: {
+  modalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '90%',
+    maxWidth: 400,
+    maxHeight: '80%',
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  modalCurrentStaff: {
+    fontSize: 14,
+    color: '#999',
+    marginBottom: 16,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#E5E5E5',
+    marginVertical: 16,
+  },
+  modalSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  staffList: {
+    maxHeight: 300,
+  },
+  staffOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#F5F5F5',
+  },
+  staffOptionSelected: {
+    backgroundColor: '#E3F2FD',
     borderWidth: 1,
     borderColor: '#007AFF',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    fontSize: 14,
-    backgroundColor: 'white',
-    minHeight: 32,
   },
-  editButton: {
-    padding: 4,
+  staffOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  staffOptionTextSelected: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  currentBadge: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+    backgroundColor: 'white',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  clearButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFF0F0',
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
+  clearButtonText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
 });
