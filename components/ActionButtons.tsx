@@ -10,9 +10,10 @@ interface ActionButtonsProps {
   onRefreshPress: () => void;
   hasSchedules: boolean;
   isRefreshing?: boolean;
+  showLoadButton?: boolean;
 }
 
-export default function ActionButtons({ onCreatePress, onEditPress, onSharePress, onLoadLastPress, onRefreshPress, hasSchedules, isRefreshing = false }: ActionButtonsProps) {
+export default function ActionButtons({ onCreatePress, onEditPress, onSharePress, onLoadLastPress, onRefreshPress, hasSchedules, isRefreshing = false, showLoadButton = true }: ActionButtonsProps) {
   return (
     <View style={styles.container}>
       <TouchableOpacity style={[styles.button, styles.createButton]} onPress={onCreatePress}>
@@ -39,10 +40,12 @@ export default function ActionButtons({ onCreatePress, onEditPress, onSharePress
         <Text style={styles.buttonText}>Refresh</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
-        <Download size={16} color="white" />
-        <Text style={styles.buttonText}>Load</Text>
-      </TouchableOpacity>
+      {showLoadButton && (
+        <TouchableOpacity style={[styles.button, styles.loadButton]} onPress={onLoadLastPress}>
+          <Download size={16} color="white" />
+          <Text style={styles.buttonText}>Load</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
