@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useSchedule } from '@/hooks/schedule-store';
-import { Save, Check, X } from 'lucide-react-native';
+import { Save, Check, X, Shuffle, Users, RotateCcw } from 'lucide-react-native';
 import { Schedule, Staff, Participant, Chore, ChecklistItem, TimeSlotAssignment } from '@/types/schedule';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQueryClient } from '@tanstack/react-query';
@@ -28,12 +28,16 @@ export default function EditScheduleScreen() {
     checklist,
     timeSlots,
     schedules,
-    updateCategory
+    updateCategory,
+    autoReassignChores,
+    getWeeklyChoreDistribution
   } = useSchedule();
   
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [editedData, setEditedData] = useState<any>(null);
   const [selectedStaffForDropOff, setSelectedStaffForDropOff] = useState<string | null>(null);
+  const [weeklyDistribution, setWeeklyDistribution] = useState<{ [staffId: string]: number }>({});
+  const [showReassignOptions, setShowReassignOptions] = useState<boolean>(false);
 
   const initializeEditData = useCallback((currentSchedule: Schedule) => {
     if (!category) return;
@@ -74,8 +78,22 @@ export default function EditScheduleScreen() {
     if (currentSchedule) {
       setSchedule(currentSchedule);
       initializeEditData(currentSchedule);
+      
+      // Load weekly distribution for chores category
+      if (category === 'chores') {
+        loadWeeklyDistribution();
+      }
     }
-  }, [selectedDate, getScheduleForDate, initializeEditData]);
+  }, [selectedDate, getScheduleForDate, initializeEditData, category]);
+
+  const loadWeeklyDistribution = async () => {
+    try {
+      const distribution = await getWeeklyChoreDistribution();
+      setWeeklyDistribution(distribution);
+    } catch (error) {
+      console.error('Error loading weekly distribution:', error);
+    }
+  };
 
   const getCategoryTitle = () => {
     switch (category) {
@@ -514,8 +532,107 @@ export default function EditScheduleScreen() {
       }
     };
     
+    const handleAutoReassign = async () => {
+      if (!schedule) return;
+      
+      if (Platform.OS === 'web') {
+        if (window.confirm('Auto-reassign all chores with weekly randomization? This will redistribute chores to ensure fair allocation.')) {
+          await performAutoReassign();
+        }
+      } else {
+        Alert.alert(
+          'Auto-Reassign Chores',
+          'This will redistribute all chores using weekly randomization to ensure fair allocation. Continue?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Reassign', onPress: performAutoReassign }
+          ]
+        );
+      }
+    };
+
+    const performAutoReassign = async () => {
+      if (!schedule) return;
+      
+      try {
+        await autoReassignChores(schedule.id);
+        // Refresh the data to show new assignments
+        const updatedSchedule = getScheduleForDate(selectedDate);
+        if (updatedSchedule) {
+          setEditedData(updatedSchedule.choreAssignments);
+          await loadWeeklyDistribution();
+        }
+        Alert.alert('Success', 'Chores have been reassigned with weekly randomization!');
+      } catch (error) {
+        console.error('Error auto-reassigning chores:', error);
+        Alert.alert('Error', 'Failed to reassign chores. Please try again.');
+      }
+    };
+
+    const handleShowReassignOptions = () => {
+      setShowReassignOptions(!showReassignOptions);
+    };
+
+    const getStaffChoreCount = (staffId: string): number => {
+      return weeklyDistribution[staffId] || 0;
+    };
+
+    const workingStaffIds = schedule?.workingStaff || [];
+    const workingStaff = staff.filter((s: Staff) => workingStaffIds.includes(s.id));
+    
     return (
       <View style={styles.listContainer}>
+        {/* Reassign Options Header */}
+        <View style={styles.choreHeader}>
+          <View style={styles.choreHeaderTop}>
+            <Text style={styles.choreHeaderTitle}>Chore Assignments</Text>
+            <TouchableOpacity 
+              style={styles.reassignButton}
+              onPress={handleShowReassignOptions}
+              activeOpacity={0.7}
+            >
+              <Shuffle size={16} color="#007AFF" />
+              <Text style={styles.reassignButtonText}>Options</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {showReassignOptions && (
+            <View style={styles.reassignOptions}>
+              <TouchableOpacity 
+                style={styles.reassignOptionButton}
+                onPress={handleAutoReassign}
+                activeOpacity={0.7}
+              >
+                <RotateCcw size={16} color="#4CAF50" />
+                <Text style={styles.reassignOptionText}>Auto Re-assign All</Text>
+              </TouchableOpacity>
+              
+              <View style={styles.weeklyStatsContainer}>
+                <View style={styles.weeklyStatsHeader}>
+                  <Users size={14} color="#666" />
+                  <Text style={styles.weeklyStatsTitle}>Weekly Chore Count</Text>
+                </View>
+                <View style={styles.weeklyStatsList}>
+                  {workingStaff
+                    .filter(s => !['Everyone', 'Drive/Outing', 'Audit', 'Antoinette'].includes(s.name))
+                    .sort((a, b) => getStaffChoreCount(b.id) - getStaffChoreCount(a.id))
+                    .map((staffMember) => {
+                      const count = getStaffChoreCount(staffMember.id);
+                      return (
+                        <View key={staffMember.id} style={styles.weeklyStatsItem}>
+                          <View style={[styles.colorDot, { backgroundColor: staffMember.color || '#666' }]} />
+                          <Text style={styles.weeklyStatsName}>{staffMember.name}</Text>
+                          <Text style={styles.weeklyStatsCount}>{count} chores</Text>
+                        </View>
+                      );
+                    })}
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Chore List */}
         {chores.map((chore: Chore) => {
           const assignment = choreAssignments.find((ca: any) => ca.choreId === chore.id);
           const assignedStaff = assignment ? staff.find((s: Staff) => s.id === assignment.staffId) : null;
@@ -532,6 +649,7 @@ export default function EditScheduleScreen() {
                 <View style={styles.staffBadge}>
                   <View style={[styles.colorDot, { backgroundColor: assignedStaff.color || '#666' }]} />
                   <Text style={styles.staffName}>{assignedStaff.name}</Text>
+                  <Text style={styles.weeklyCountBadge}>({getStaffChoreCount(assignedStaff.id)})</Text>
                 </View>
               ) : (
                 <Text style={styles.unassignedText}>Tap to assign</Text>
@@ -1091,5 +1209,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     textAlign: 'center' as const,
+  },
+  // Chore assignment styles
+  choreHeader: {
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  choreHeaderTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+  },
+  choreHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: '#333',
+  },
+  reassignButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+    gap: 4,
+  },
+  reassignButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '500' as const,
+  },
+  reassignOptions: {
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+    backgroundColor: '#f8f8f8',
+  },
+  reassignOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+    gap: 8,
+  },
+  reassignOptionText: {
+    color: '#4CAF50',
+    fontSize: 16,
+    fontWeight: '600' as const,
+  },
+  weeklyStatsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  weeklyStatsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+    gap: 6,
+  },
+  weeklyStatsTitle: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#666',
+  },
+  weeklyStatsList: {
+    gap: 6,
+  },
+  weeklyStatsItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  weeklyStatsName: {
+    flex: 1,
+    fontSize: 13,
+    color: '#333',
+    marginLeft: 4,
+  },
+  weeklyStatsCount: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500' as const,
+  },
+  weeklyCountBadge: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 4,
   },
 });

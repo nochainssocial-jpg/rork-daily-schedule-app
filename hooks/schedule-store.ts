@@ -614,7 +614,8 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     return { frontRoom, scotty, twins };
   };
 
-  const generateChoreAssignments = (workingStaffIds: string[]): ChoreAssignment[] => {
+  // Enhanced chore assignment with weekly randomization
+  const generateChoreAssignments = async (workingStaffIds: string[], forceRegenerate: boolean = false): Promise<ChoreAssignment[]> => {
     const chores = choresQuery.data || [];
     const staff = staffQuery.data || [];
     const assignments: ChoreAssignment[] = [];
@@ -626,17 +627,91 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       return staffMember && !excludedNames.includes(staffMember.name);
     });
 
-    chores.forEach((chore: Chore) => {
-      if (validStaffIds.length > 0) {
+    if (validStaffIds.length === 0) {
+      return assignments;
+    }
+
+    // Get current week's start date (Monday)
+    const currentDate = new Date(selectedDate);
+    const dayOfWeek = currentDate.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Sunday = 0, Monday = 1
+    const weekStart = new Date(currentDate);
+    weekStart.setDate(currentDate.getDate() + mondayOffset);
+    const weekKey = weekStart.toISOString().split('T')[0];
+
+    try {
+      // Load existing weekly assignments
+      const weeklyAssignmentsKey = `weeklyChoreAssignments_${weekKey}`;
+      let weeklyAssignments: { [choreId: string]: string[] } = {}; // choreId -> [staffIds for each day]
+      
+      if (!forceRegenerate) {
+        const stored = await AsyncStorage.getItem(weeklyAssignmentsKey);
+        if (stored) {
+          try {
+            const trimmed = stored.trim();
+            if (trimmed && (trimmed.startsWith('{') || trimmed.startsWith('['))) {
+              weeklyAssignments = JSON.parse(trimmed);
+            }
+          } catch (parseError) {
+            console.error('Error parsing weekly assignments:', parseError);
+            weeklyAssignments = {};
+          }
+        }
+      }
+
+      // Calculate which day of the week this is (0 = Monday, 6 = Sunday)
+      const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+      // Generate assignments for each chore
+      chores.forEach((chore: Chore) => {
+        if (!weeklyAssignments[chore.id]) {
+          weeklyAssignments[chore.id] = new Array(7).fill(null);
+        }
+
+        // If this day doesn't have an assignment yet, or we're forcing regeneration
+        if (!weeklyAssignments[chore.id][dayIndex] || forceRegenerate) {
+          // Get staff assignments for this chore across the week
+          const choreStaffThisWeek = weeklyAssignments[chore.id].filter(Boolean);
+          
+          // Try to find staff who haven't been assigned this chore this week
+          let availableStaff = validStaffIds.filter(staffId => 
+            !choreStaffThisWeek.includes(staffId)
+          );
+          
+          // If everyone has been assigned this chore, use all valid staff
+          if (availableStaff.length === 0) {
+            availableStaff = [...validStaffIds];
+          }
+          
+          // Randomize selection from available staff
+          const randomStaffId = availableStaff[Math.floor(Math.random() * availableStaff.length)];
+          weeklyAssignments[chore.id][dayIndex] = randomStaffId;
+        }
+
+        // Add assignment for today
+        const todayStaffId = weeklyAssignments[chore.id][dayIndex];
+        if (todayStaffId) {
+          assignments.push({ choreId: chore.id, staffId: todayStaffId });
+        }
+      });
+
+      // Save updated weekly assignments
+      await AsyncStorage.setItem(weeklyAssignmentsKey, JSON.stringify(weeklyAssignments));
+      
+      console.log('Generated chore assignments with weekly randomization:', assignments.length);
+      return assignments;
+    } catch (error) {
+      console.error('Error generating chore assignments:', error);
+      // Fallback to simple random assignment
+      chores.forEach((chore: Chore) => {
         const randomStaffId = validStaffIds[Math.floor(Math.random() * validStaffIds.length)];
         assignments.push({ choreId: chore.id, staffId: randomStaffId });
-      }
-    });
-
-    return assignments;
+      });
+      return assignments;
+    }
   };
 
-  const createSchedule = (
+  const createSchedule = async (
     workingStaff: string[],
     attendingParticipants: string[],
     assignments: Assignment[],
@@ -647,7 +722,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     console.log('Attending participants:', attendingParticipants.length);
     
     const timeSlotAssignments = generateTimeSlotAssignments(workingStaff);
-    const choreAssignments = generateChoreAssignments(workingStaff);
+    const choreAssignments = await generateChoreAssignments(workingStaff);
 
     const schedule: Schedule = {
       id: `schedule-${selectedDate}`,
@@ -719,12 +794,12 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
   };
 
   // Regenerate assignments with updated staff
-  const regenerateAssignments = (scheduleId: string) => {
+  const regenerateAssignments = async (scheduleId: string, forceChoreRegeneration: boolean = false) => {
     const schedules = schedulesQuery.data || [];
     const schedule = schedules.find((s: Schedule) => s.id === scheduleId);
     if (schedule) {
       const timeSlotAssignments = generateTimeSlotAssignments(schedule.workingStaff);
-      const choreAssignments = generateChoreAssignments(schedule.workingStaff);
+      const choreAssignments = await generateChoreAssignments(schedule.workingStaff, forceChoreRegeneration);
       
       const updatedSchedule: Schedule = {
         ...schedule,
@@ -735,6 +810,48 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       };
       
       saveScheduleMutation.mutate(updatedSchedule);
+    }
+  };
+
+  // Auto-reassign chores with weekly randomization
+  const autoReassignChores = async (scheduleId: string) => {
+    console.log('Auto-reassigning chores for schedule:', scheduleId);
+    await regenerateAssignments(scheduleId, true);
+  };
+
+  // Get weekly chore distribution for analysis
+  const getWeeklyChoreDistribution = async (): Promise<{ [staffId: string]: number }> => {
+    try {
+      const currentDate = new Date(selectedDate);
+      const dayOfWeek = currentDate.getDay();
+      const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const weekStart = new Date(currentDate);
+      weekStart.setDate(currentDate.getDate() + mondayOffset);
+      const weekKey = weekStart.toISOString().split('T')[0];
+
+      const weeklyAssignmentsKey = `weeklyChoreAssignments_${weekKey}`;
+      const stored = await AsyncStorage.getItem(weeklyAssignmentsKey);
+      
+      if (!stored) {
+        return {};
+      }
+
+      const weeklyAssignments = JSON.parse(stored);
+      const distribution: { [staffId: string]: number } = {};
+
+      // Count assignments per staff member
+      Object.values(weeklyAssignments).forEach((choreWeek: any) => {
+        choreWeek.forEach((staffId: string) => {
+          if (staffId) {
+            distribution[staffId] = (distribution[staffId] || 0) + 1;
+          }
+        });
+      });
+
+      return distribution;
+    } catch (error) {
+      console.error('Error getting weekly chore distribution:', error);
+      return {};
     }
   };
 
@@ -1200,6 +1317,10 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     saveChecklist: saveChecklistMutation.mutate,
     regenerateAssignments,
     updateWorkingStaffWithNewStaff,
+    
+    // Chore assignment functions
+    autoReassignChores,
+    getWeeklyChoreDistribution,
     
     // Sharing functions
     shareScheduleWithCode,
