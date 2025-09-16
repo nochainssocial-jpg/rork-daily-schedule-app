@@ -1,13 +1,15 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Share as RNShare } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Share as RNShare, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import type { Staff, Participant, Chore, TimeSlot, DropOffAssignment, PickupAssignment } from '@/types/schedule';
-import { RefreshCw, AlertCircle, FileText } from 'lucide-react-native';
+import { RefreshCw, AlertCircle, FileText, Edit2, Check, X } from 'lucide-react-native';
 
 export default function ViewPDFScreen() {
-  const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion } = useSchedule();
+  const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion, updateScheduleImmediately } = useSchedule();
   const [refreshing, setRefreshing] = useState(false);
+  const [editingSlot, setEditingSlot] = useState<{ type: 'frontRoom' | 'scotty' | 'twins'; timeSlotId: string } | null>(null);
+  const [editValue, setEditValue] = useState('');
   const insets = useSafeAreaInsets();
   
   const schedule = getScheduleForDate(selectedDate);
@@ -371,7 +373,7 @@ export default function ViewPDFScreen() {
         <Text style={[styles.sectionTitle, { color: categoryColors.assignments }]}>3. Daily Assignment</Text>
         {schedule.assignments.map((assignment, index) => (
           <View key={index} style={styles.assignmentItem}>
-            <Text style={styles.staffName}>{getStaffName(assignment.staffId)}</Text>
+            <Text style={styles.staffNameHeader}>{getStaffName(assignment.staffId)}</Text>
             {assignment.participantIds.map(participantId => (
               <Text key={participantId} style={styles.participantName}>
                 • {getParticipantName(participantId)}
@@ -381,42 +383,206 @@ export default function ViewPDFScreen() {
         ))}
       </View>
 
-      {/* Front Room - Not shown on Saturdays */}
+      {/* Time Slots Table - Not shown on Saturdays */}
       {!isSaturday() && (
         <View style={[styles.section, { borderLeftColor: categoryColors.frontRoom }]}>
-          <Text style={[styles.sectionTitle, { color: categoryColors.frontRoom }]}>4. Front Room</Text>
-          {schedule.frontRoomSlots.map((slot, index) => (
-            <View key={index} style={styles.timeSlotItem}>
-              <Text style={styles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</Text>
-              <Text style={styles.assignedStaff}>{getStaffName(slot.staffId)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Scotty - Not shown on Saturdays */}
-      {!isSaturday() && (
-        <View style={[styles.section, { borderLeftColor: categoryColors.scotty }]}>
-          <Text style={[styles.sectionTitle, { color: categoryColors.scotty }]}>5. Scotty</Text>
-          {schedule.scottySlots.map((slot, index) => (
-            <View key={index} style={styles.timeSlotItem}>
-              <Text style={styles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</Text>
-              <Text style={styles.assignedStaff}>{getStaffName(slot.staffId)}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      {/* Twins - Not shown on Saturdays */}
-      {!isSaturday() && (
-        <View style={[styles.section, { borderLeftColor: categoryColors.twins }]}>
-          <Text style={[styles.sectionTitle, { color: categoryColors.twins }]}>6. Twins</Text>
-          {schedule.twinsSlots.map((slot, index) => (
-            <View key={index} style={styles.timeSlotItem}>
-              <Text style={styles.timeSlot}>{getTimeSlotDisplay(slot.timeSlotId)}</Text>
-              <Text style={styles.assignedStaff}>{getStaffName(slot.staffId)}</Text>
-            </View>
-          ))}
+          <Text style={[styles.sectionTitle, { color: categoryColors.frontRoom }]}>4. Time Slot Assignments</Text>
+          
+          {/* Table Header */}
+          <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderCell, styles.timeColumn]}>Time</Text>
+            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Front Room</Text>
+            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Scott</Text>
+            <Text style={[styles.tableHeaderCell, styles.staffColumn]}>Twins</Text>
+          </View>
+          
+          {/* Table Rows */}
+          {timeSlots.map((timeSlot) => {
+            const frontRoomSlot = schedule.frontRoomSlots.find(s => s.timeSlotId === timeSlot.id);
+            const scottySlot = schedule.scottySlots.find(s => s.timeSlotId === timeSlot.id);
+            const twinsSlot = schedule.twinsSlots.find(s => s.timeSlotId === timeSlot.id);
+            
+            const isEditingFrontRoom = editingSlot?.type === 'frontRoom' && editingSlot?.timeSlotId === timeSlot.id;
+            const isEditingScotty = editingSlot?.type === 'scotty' && editingSlot?.timeSlotId === timeSlot.id;
+            const isEditingTwins = editingSlot?.type === 'twins' && editingSlot?.timeSlotId === timeSlot.id;
+            
+            return (
+              <View key={timeSlot.id} style={styles.tableRow}>
+                <Text style={[styles.tableCell, styles.timeColumn]}>{timeSlot.displayTime}</Text>
+                
+                {/* Front Room Cell */}
+                <View style={[styles.tableCell, styles.staffColumn]}>
+                  {isEditingFrontRoom ? (
+                    <View style={styles.editContainer}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editValue}
+                        onChangeText={setEditValue}
+                        placeholder="Staff name"
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
+                          if (staffMember) {
+                            const updatedSchedule = { ...schedule };
+                            const slotIndex = updatedSchedule.frontRoomSlots.findIndex(s => s.timeSlotId === timeSlot.id);
+                            if (slotIndex >= 0) {
+                              updatedSchedule.frontRoomSlots[slotIndex].staffId = staffMember.id;
+                            } else {
+                              updatedSchedule.frontRoomSlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
+                            }
+                            updateScheduleImmediately(updatedSchedule);
+                          }
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <Check size={16} color="#4CAF50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <X size={16} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.editableCell}
+                      onPress={() => {
+                        setEditingSlot({ type: 'frontRoom', timeSlotId: timeSlot.id });
+                        setEditValue(frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '');
+                      }}
+                    >
+                      <Text style={styles.staffName}>
+                        {frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '-'}
+                      </Text>
+                      <Edit2 size={14} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                {/* Scott Cell */}
+                <View style={[styles.tableCell, styles.staffColumn]}>
+                  {isEditingScotty ? (
+                    <View style={styles.editContainer}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editValue}
+                        onChangeText={setEditValue}
+                        placeholder="Staff name"
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
+                          if (staffMember) {
+                            const updatedSchedule = { ...schedule };
+                            const slotIndex = updatedSchedule.scottySlots.findIndex(s => s.timeSlotId === timeSlot.id);
+                            if (slotIndex >= 0) {
+                              updatedSchedule.scottySlots[slotIndex].staffId = staffMember.id;
+                            } else {
+                              updatedSchedule.scottySlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
+                            }
+                            updateScheduleImmediately(updatedSchedule);
+                          }
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <Check size={16} color="#4CAF50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <X size={16} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.editableCell}
+                      onPress={() => {
+                        setEditingSlot({ type: 'scotty', timeSlotId: timeSlot.id });
+                        setEditValue(scottySlot ? getStaffName(scottySlot.staffId) : '');
+                      }}
+                    >
+                      <Text style={styles.staffName}>
+                        {scottySlot ? getStaffName(scottySlot.staffId) : '-'}
+                      </Text>
+                      <Edit2 size={14} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                
+                {/* Twins Cell */}
+                <View style={[styles.tableCell, styles.staffColumn]}>
+                  {isEditingTwins ? (
+                    <View style={styles.editContainer}>
+                      <TextInput
+                        style={styles.editInput}
+                        value={editValue}
+                        onChangeText={setEditValue}
+                        placeholder="Staff name"
+                        autoFocus
+                      />
+                      <TouchableOpacity
+                        onPress={() => {
+                          const staffMember = staff.find(s => s.name.toLowerCase() === editValue.toLowerCase());
+                          if (staffMember) {
+                            const updatedSchedule = { ...schedule };
+                            const slotIndex = updatedSchedule.twinsSlots.findIndex(s => s.timeSlotId === timeSlot.id);
+                            if (slotIndex >= 0) {
+                              updatedSchedule.twinsSlots[slotIndex].staffId = staffMember.id;
+                            } else {
+                              updatedSchedule.twinsSlots.push({ timeSlotId: timeSlot.id, staffId: staffMember.id });
+                            }
+                            updateScheduleImmediately(updatedSchedule);
+                          }
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <Check size={16} color="#4CAF50" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setEditingSlot(null);
+                          setEditValue('');
+                        }}
+                        style={styles.editButton}
+                      >
+                        <X size={16} color="#FF6B6B" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.editableCell}
+                      onPress={() => {
+                        setEditingSlot({ type: 'twins', timeSlotId: timeSlot.id });
+                        setEditValue(twinsSlot ? getStaffName(twinsSlot.staffId) : '');
+                      }}
+                    >
+                      <Text style={styles.staffName}>
+                        {twinsSlot ? getStaffName(twinsSlot.staffId) : '-'}
+                      </Text>
+                      <Edit2 size={14} color="#999" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
 
@@ -599,7 +765,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
-  staffName: {
+  staffNameHeader: {
     fontSize: 16,
     fontWeight: '600',
     color: '#007AFF',
@@ -708,5 +874,72 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 6,
     marginLeft: 8,
+  },
+  tableHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 2,
+    borderBottomColor: '#E0E0E0',
+    paddingBottom: 8,
+    marginBottom: 4,
+  },
+  tableHeaderCell: {
+    fontWeight: '600',
+    fontSize: 14,
+    color: '#333',
+    paddingHorizontal: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+    paddingVertical: 8,
+    minHeight: 44,
+    alignItems: 'center',
+  },
+  tableCell: {
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+  },
+  timeColumn: {
+    flex: 0.8,
+    minWidth: 80,
+  },
+  staffColumn: {
+    flex: 1,
+    minWidth: 90,
+  },
+  editableCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    backgroundColor: '#F9F9F9',
+    borderRadius: 4,
+    minHeight: 32,
+  },
+  staffName: {
+    fontSize: 14,
+    color: '#007AFF',
+    flex: 1,
+  },
+  editContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  editInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 14,
+    backgroundColor: 'white',
+    minHeight: 32,
+  },
+  editButton: {
+    padding: 4,
   },
 });
