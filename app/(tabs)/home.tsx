@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [showScheduleSelector, setShowScheduleSelector] = useState<boolean>(false);
-  const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
+
 
 
   useEffect(() => {
@@ -110,10 +110,7 @@ export default function HomeScreen() {
         }
       }
       
-      // After initial load is complete, show the Load button
-      setTimeout(() => {
-        setIsInitialLoad(false);
-      }, 1500);
+
     };
     
     // Small delay to let the component settle
@@ -416,7 +413,7 @@ export default function HomeScreen() {
             onRefreshPress={handleRefreshPress}
             hasSchedules={schedules.length > 0}
             isRefreshing={isRefreshing}
-            showLoadButton={!isInitialLoad}
+            showLoadButton={false}
           />
         </View>
         
