@@ -614,7 +614,7 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
     return { frontRoom, scotty, twins };
   };
 
-  // Enhanced chore assignment with weekly randomization
+  // Enhanced chore assignment with weekly randomization - OPTIMIZED for 1 chore per person
   const generateChoreAssignments = async (workingStaffIds: string[], forceRegenerate: boolean = false): Promise<ChoreAssignment[]> => {
     const chores = choresQuery.data || [];
     const staff = staffQuery.data || [];
@@ -662,8 +662,26 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       // Calculate which day of the week this is (0 = Monday, 6 = Sunday)
       const dayIndex = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
 
-      // Generate assignments for each chore
-      chores.forEach((chore: Chore) => {
+      // Track staff assignments for today to ensure only 1 chore per person
+      const todayStaffAssignments: Set<string> = new Set();
+      
+      // First, collect existing assignments for today that we're keeping
+      if (!forceRegenerate) {
+        chores.forEach((chore: Chore) => {
+          if (weeklyAssignments[chore.id] && weeklyAssignments[chore.id][dayIndex]) {
+            const existingStaffId = weeklyAssignments[chore.id][dayIndex];
+            if (validStaffIds.includes(existingStaffId)) {
+              todayStaffAssignments.add(existingStaffId);
+            }
+          }
+        });
+      }
+
+      // Shuffle chores array for random assignment order
+      const shuffledChores = [...chores].sort(() => Math.random() - 0.5);
+
+      // Generate assignments for each chore with 1-per-person constraint
+      shuffledChores.forEach((chore: Chore) => {
         if (!weeklyAssignments[chore.id]) {
           weeklyAssignments[chore.id] = new Array(7).fill(null);
         }
@@ -673,24 +691,61 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
           // Get staff assignments for this chore across the week
           const choreStaffThisWeek = weeklyAssignments[chore.id].filter(Boolean);
           
-          // Try to find staff who haven't been assigned this chore this week
+          // Find staff who:
+          // 1. Haven't been assigned this chore this week (for variety)
+          // 2. Don't already have a chore assigned today (1 chore per person)
+          // 3. Are in the valid staff list
           let availableStaff = validStaffIds.filter(staffId => 
-            !choreStaffThisWeek.includes(staffId)
+            !choreStaffThisWeek.includes(staffId) && 
+            !todayStaffAssignments.has(staffId)
           );
           
-          // If everyone has been assigned this chore, use all valid staff
+          // If no staff available with weekly variety constraint, relax it but keep 1-per-day constraint
           if (availableStaff.length === 0) {
-            availableStaff = [...validStaffIds];
+            availableStaff = validStaffIds.filter(staffId => 
+              !todayStaffAssignments.has(staffId)
+            );
           }
           
-          // Randomize selection from available staff
-          const randomStaffId = availableStaff[Math.floor(Math.random() * availableStaff.length)];
-          weeklyAssignments[chore.id][dayIndex] = randomStaffId;
+          // If still no staff available (more chores than staff), assign to least loaded staff
+          if (availableStaff.length === 0) {
+            // Count current assignments per staff member for today
+            const staffChoreCount: { [staffId: string]: number } = {};
+            validStaffIds.forEach(staffId => {
+              staffChoreCount[staffId] = 0;
+            });
+            
+            // Count existing assignments
+            todayStaffAssignments.forEach(staffId => {
+              if (staffChoreCount[staffId] !== undefined) {
+                staffChoreCount[staffId]++;
+              }
+            });
+            
+            // Find staff with minimum assignments
+            const minAssignments = Math.min(...Object.values(staffChoreCount));
+            availableStaff = validStaffIds.filter(staffId => 
+              staffChoreCount[staffId] === minAssignments
+            );
+          }
+          
+          if (availableStaff.length > 0) {
+            // Randomize selection from available staff
+            const randomStaffId = availableStaff[Math.floor(Math.random() * availableStaff.length)];
+            weeklyAssignments[chore.id][dayIndex] = randomStaffId;
+            todayStaffAssignments.add(randomStaffId);
+          }
+        } else {
+          // Keep existing assignment and track it
+          const existingStaffId = weeklyAssignments[chore.id][dayIndex];
+          if (validStaffIds.includes(existingStaffId)) {
+            todayStaffAssignments.add(existingStaffId);
+          }
         }
 
         // Add assignment for today
         const todayStaffId = weeklyAssignments[chore.id][dayIndex];
-        if (todayStaffId) {
+        if (todayStaffId && validStaffIds.includes(todayStaffId)) {
           assignments.push({ choreId: chore.id, staffId: todayStaffId });
         }
       });
@@ -698,15 +753,36 @@ export const [ScheduleProvider, useSchedule] = createContextHook(() => {
       // Save updated weekly assignments
       await AsyncStorage.setItem(weeklyAssignmentsKey, JSON.stringify(weeklyAssignments));
       
-      console.log('Generated chore assignments with weekly randomization:', assignments.length);
+      console.log('Generated optimized chore assignments (1 per person):', assignments.length);
+      console.log('Staff with assignments today:', todayStaffAssignments.size, 'out of', validStaffIds.length, 'available staff');
+      
+      // Log assignment distribution for debugging
+      const assignmentCounts: { [staffId: string]: number } = {};
+      assignments.forEach(assignment => {
+        assignmentCounts[assignment.staffId] = (assignmentCounts[assignment.staffId] || 0) + 1;
+      });
+      console.log('Chore distribution today:', assignmentCounts);
+      
       return assignments;
     } catch (error) {
       console.error('Error generating chore assignments:', error);
-      // Fallback to simple random assignment
-      chores.forEach((chore: Chore) => {
-        const randomStaffId = validStaffIds[Math.floor(Math.random() * validStaffIds.length)];
-        assignments.push({ choreId: chore.id, staffId: randomStaffId });
+      // Fallback to optimized simple assignment (1 per person)
+      const usedStaff: Set<string> = new Set();
+      const shuffledChores = [...chores].sort(() => Math.random() - 0.5);
+      
+      shuffledChores.forEach((chore: Chore) => {
+        const availableStaff = validStaffIds.filter(staffId => !usedStaff.has(staffId));
+        if (availableStaff.length > 0) {
+          const randomStaffId = availableStaff[Math.floor(Math.random() * availableStaff.length)];
+          assignments.push({ choreId: chore.id, staffId: randomStaffId });
+          usedStaff.add(randomStaffId);
+        } else if (validStaffIds.length > 0) {
+          // If more chores than staff, assign to random staff (but this breaks 1-per-person rule)
+          const randomStaffId = validStaffIds[Math.floor(Math.random() * validStaffIds.length)];
+          assignments.push({ choreId: chore.id, staffId: randomStaffId });
+        }
       });
+      
       return assignments;
     }
   };
