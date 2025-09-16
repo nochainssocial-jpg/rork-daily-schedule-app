@@ -339,7 +339,7 @@ export default function HelpScreen() {
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Settings size={20} color="white" style={{ marginRight: 8 }} />
+                <Settings size={20} color="white" />
                 <Text style={styles.diagnosticsButtonText}>Check Data Integrity</Text>
               </>
             )}
@@ -354,7 +354,7 @@ export default function HelpScreen() {
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <RefreshCw size={20} color="white" style={{ marginRight: 8 }} />
+                <RefreshCw size={20} color="white" />
                 <Text style={styles.diagnosticsButtonText}>Refresh All Data</Text>
               </>
             )}
@@ -364,7 +364,7 @@ export default function HelpScreen() {
             style={[styles.diagnosticsButton, { backgroundColor: '#FF9800' }]}
             onPress={handleExportDebugLog}
           >
-            <FileText size={20} color="white" style={{ marginRight: 8 }} />
+            <FileText size={20} color="white" />
             <Text style={styles.diagnosticsButtonText}>Export Debug Log to Console</Text>
           </TouchableOpacity>
           
@@ -384,7 +384,7 @@ export default function HelpScreen() {
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Trash2 size={20} color="white" style={{ marginRight: 8 }} />
+                <Trash2 size={20} color="white" />
                 <Text style={styles.diagnosticsButtonText}>Clear All Data & Reset</Text>
               </>
             )}
@@ -536,6 +536,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     marginTop: 10,
+    gap: 8,
   },
   diagnosticsButtonText: {
     color: 'white',
