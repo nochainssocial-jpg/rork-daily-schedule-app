@@ -206,7 +206,7 @@ export default function DropoffsPickupsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Pickups</Text>
           <Text style={styles.sectionDescription}>
-            Select participants who need to be picked up in the afternoon (only showing those not assigned to drop-offs).
+            Select participants who need to be picked up in the afternoon (only showing those not assigned to drop-offs)
           </Text>
           
           <View style={styles.participantsList}>
