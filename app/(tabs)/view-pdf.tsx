@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import type { Staff, Participant, Chore, TimeSlot, DropOffAssignment, PickupAssignment } from '@/types/schedule';
-import { RefreshCw, AlertCircle, FileText, UserPlus, X } from 'lucide-react-native';
+import { RefreshCw, AlertCircle, FileText, UserPlus, X, Printer } from 'lucide-react-native';
 
 export default function ViewPDFScreen() {
   const { selectedDate, getScheduleForDate, staff, participants, chores, timeSlots, hasNewUpdates, markUpdatesAsViewed, appVersion, updateScheduleImmediately } = useSchedule();
@@ -211,6 +211,269 @@ export default function ViewPDFScreen() {
     return scheduleText;
   }, [schedule, selectedDate, appVersion, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, groupedDropOffs, groupedPickups]);
 
+  const printSchedule = useCallback(() => {
+    if (!schedule) {
+      Alert.alert('No Schedule', 'No schedule available to print');
+      return;
+    }
+
+    if (Platform.OS !== 'web') {
+      Alert.alert('Print Not Available', 'Printing is only available on web browsers.');
+      return;
+    }
+
+    // Generate HTML content for printing
+    const generatePrintHTML = () => {
+      const formatDate = () => {
+        const [year, month, day] = selectedDate.split('-');
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      };
+
+      const pageStyle = `
+        <style>
+          @page {
+            margin: 20mm;
+            size: A4;
+          }
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+          }
+          .page {
+            page-break-after: always;
+            min-height: 100vh;
+            padding: 20px;
+          }
+          .page:last-child {
+            page-break-after: avoid;
+          }
+          .header {
+            text-align: center;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+          }
+          .title {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 0;
+          }
+          .date {
+            font-size: 16px;
+            color: #666;
+            margin: 5px 0 0 0;
+          }
+          .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007AFF;
+            margin: 20px 0 10px 0;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+          }
+          .item {
+            margin: 5px 0;
+            padding-left: 10px;
+          }
+          .staff-group {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-left: 4px solid #007AFF;
+          }
+          .staff-name {
+            font-weight: bold;
+            color: #007AFF;
+            margin-bottom: 5px;
+          }
+          .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+          }
+          .table th, .table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: center;
+          }
+          .table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          .chore-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+          }
+          .no-items {
+            color: #999;
+            font-style: italic;
+            padding: 10px;
+          }
+        </style>
+      `;
+
+      // Page 1: Overview
+      const overviewPage = `
+        <div class="page">
+          <div class="header">
+            <h1 class="title">Daily Schedule Overview</h1>
+            <p class="date">${formatDate()}</p>
+          </div>
+          
+          <div class="section-title">1. Staff Working Today</div>
+          ${schedule.workingStaff && schedule.workingStaff.length > 0 ? 
+            schedule.workingStaff.map(staffId => `<div class="item">• ${getStaffName(staffId)}</div>`).join('') :
+            '<div class="no-items">No staff assigned</div>'
+          }
+          
+          <div class="section-title">2. Participants Attending Today</div>
+          ${schedule.attendingParticipants && schedule.attendingParticipants.length > 0 ? 
+            schedule.attendingParticipants.map(participantId => `<div class="item">• ${getParticipantName(participantId)}</div>`).join('') :
+            '<div class="no-items">No participants assigned</div>'
+          }
+          
+          <div class="section-title">3. Daily Assignment</div>
+          ${schedule.assignments.map(assignment => `
+            <div class="staff-group">
+              <div class="staff-name">${getStaffName(assignment.staffId)}</div>
+              ${assignment.participantIds.map(participantId => `<div class="item">• ${getParticipantName(participantId)}</div>`).join('')}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      // Page 2: Time Slots (only if not Saturday)
+      const timeSlotsPage = !isSaturday() ? `
+        <div class="page">
+          <div class="header">
+            <h1 class="title">Time Slot Assignments</h1>
+            <p class="date">${formatDate()}</p>
+          </div>
+          
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Front Room</th>
+                <th>Scott</th>
+                <th>Twins</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${timeSlots.map(timeSlot => {
+                const frontRoomSlot = schedule.frontRoomSlots.find(s => s.timeSlotId === timeSlot.id);
+                const scottySlot = schedule.scottySlots.find(s => s.timeSlotId === timeSlot.id);
+                const twinsSlot = schedule.twinsSlots.find(s => s.timeSlotId === timeSlot.id);
+                return `
+                  <tr>
+                    <td>${timeSlot.displayTime}</td>
+                    <td>${frontRoomSlot ? getStaffName(frontRoomSlot.staffId) : '-'}</td>
+                    <td>${scottySlot ? getStaffName(scottySlot.staffId) : '-'}</td>
+                    <td>${twinsSlot ? getStaffName(twinsSlot.staffId) : '-'}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '';
+
+      // Page 3: Chores and Tasks
+      const choresPage = `
+        <div class="page">
+          <div class="header">
+            <h1 class="title">Chores and Tasks</h1>
+            <p class="date">${formatDate()}</p>
+          </div>
+          
+          <div class="section-title">${isSaturday() ? '4' : '7'}. Chores</div>
+          ${schedule.choreAssignments.map(assignment => `
+            <div class="chore-item">
+              <span>${getChoreName(assignment.choreId)}</span>
+              <span><strong>${getStaffName(assignment.staffId)}</strong></span>
+            </div>
+          `).join('')}
+          
+          <div class="section-title">${isSaturday() ? '7' : '10'}. Final Checklist</div>
+          <div class="staff-group">
+            <div class="staff-name">Assigned to: ${getStaffName(schedule.finalChecklistStaff)}</div>
+          </div>
+        </div>
+      `;
+
+      // Page 4: Drop-offs and Pickups
+      const transportPage = `
+        <div class="page">
+          <div class="header">
+            <h1 class="title">Drop-offs and Pickups</h1>
+            <p class="date">${formatDate()}</p>
+          </div>
+          
+          <div class="section-title">${isSaturday() ? '5' : '8'}. Drop-offs</div>
+          ${groupedDropOffs.length > 0 ? 
+            groupedDropOffs.map(group => `
+              <div class="staff-group">
+                <div class="staff-name">${getStaffName(group.staffId)}</div>
+                <div class="item">${group.dropOffs.map(d => getParticipantName(d.participantId)).join(', ')}</div>
+              </div>
+            `).join('') :
+            '<div class="no-items">No drop-offs scheduled</div>'
+          }
+          
+          <div class="section-title">${isSaturday() ? '6' : '9'}. Pickups</div>
+          ${groupedPickups.length > 0 ? 
+            groupedPickups.map(group => `
+              <div class="staff-group">
+                <div class="staff-name">${getStaffName(group.staffId)}</div>
+                <div class="item">${group.pickups.map(p => getParticipantName(p.participantId)).join(', ')}</div>
+              </div>
+            `).join('') :
+            '<div class="no-items">No pickups scheduled</div>'
+          }
+        </div>
+      `;
+
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Daily Schedule - ${formatDate()}</title>
+          ${pageStyle}
+        </head>
+        <body>
+          ${overviewPage}
+          ${timeSlotsPage}
+          ${choresPage}
+          ${transportPage}
+        </body>
+        </html>
+      `;
+    };
+
+    // Create and open print window
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(generatePrintHTML());
+      printWindow.document.close();
+      
+      // Wait for content to load then show print dialog
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      };
+    } else {
+      Alert.alert('Print Error', 'Unable to open print window. Please check your browser settings.');
+    }
+  }, [schedule, selectedDate, getStaffName, getParticipantName, getChoreName, getTimeSlotDisplay, isSaturday, groupedDropOffs, groupedPickups, timeSlots]);
+
   const shareSchedule = useCallback(async () => {
     if (!schedule) {
       Alert.alert('No Schedule', 'No schedule available to share');
@@ -337,13 +600,22 @@ export default function ViewPDFScreen() {
         </View>
         <View style={styles.actionRow}>
           <Text style={styles.versionText}>Version {appVersion}</Text>
-          <TouchableOpacity 
-            style={styles.shareButton} 
-            onPress={shareSchedule}
-          >
-            <FileText size={16} color="white" />
-            <Text style={styles.shareButtonText}>Share Schedule</Text>
-          </TouchableOpacity>
+          <View style={styles.actionButtons}>
+            <TouchableOpacity 
+              style={styles.printButton} 
+              onPress={printSchedule}
+            >
+              <Printer size={16} color="white" />
+              <Text style={styles.printButtonText}>Print PDF</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.shareButton} 
+              onPress={shareSchedule}
+            >
+              <FileText size={16} color="white" />
+              <Text style={styles.shareButtonText}>Share Schedule</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -748,6 +1020,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  printButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+  },
+  printButtonText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '600',
   },
   shareButton: {
     flexDirection: 'row',
