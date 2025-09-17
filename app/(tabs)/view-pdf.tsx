@@ -415,7 +415,9 @@ export default function ViewPDFScreen() {
             
             return (
               <View key={timeSlot.id} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.timeColumn]}>{timeSlot.displayTime}</Text>
+                <View style={[styles.tableCell, styles.timeColumn]}>
+                  <Text style={styles.timeText}>{timeSlot.displayTime}</Text>
+                </View>
                 
                 {/* Front Room Cell */}
                 <TouchableOpacity
@@ -1051,5 +1053,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FF6B6B',
     fontWeight: '600',
+  },
+  timeText: {
+    fontSize: 14,
+    color: '#333',
+    textAlign: 'center' as const,
   },
 });
