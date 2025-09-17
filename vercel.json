@@ -1,12 +1,15 @@
 {
-  "buildCommand": "bun install && npx expo export -p web",
+  "buildCommand": "npm install && npx expo export -p web",
   "outputDirectory": "dist",
   "framework": null,
-  "installCommand": "bun install",
+  "installCommand": "npm install",
   "functions": {
     "backend/hono.ts": {
       "runtime": "nodejs20.x"
     }
+  },
+  "env": {
+    "NODE_ENV": "production"
   },
   "rewrites": [
     {
