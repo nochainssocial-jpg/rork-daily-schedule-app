@@ -2,8 +2,8 @@ const { serve } = require('@hono/node-server');
 const path = require('path');
 const fs = require('fs');
 
-// Define __dirname for CommonJS compatibility
-const __dirname = path.dirname(require.main.filename);
+// Get current directory
+const __dirname = process.cwd();
 
 // Import the Hono app (we'll need to transpile TypeScript)
 const { Hono } = require('hono');
