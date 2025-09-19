@@ -316,6 +316,50 @@ const createMainPage = () => {
             resize: vertical;
         }
         
+        .selection-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .selection-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+        
+        .selection-item:hover {
+            border-color: #007AFF;
+            background: #f0f8ff;
+        }
+        
+        .selection-item.selected {
+            border-color: #007AFF;
+            background: #007AFF;
+            color: white;
+        }
+        
+        .selection-item input[type="checkbox"] {
+            margin-right: 8px;
+            width: auto;
+        }
+        
+        .selection-section {
+            margin-bottom: 20px;
+        }
+        
+        .selection-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
         .schedule-list {
             margin-top: 20px;
         }
@@ -483,13 +527,17 @@ const createMainPage = () => {
                     <label for="scheduleDescription">Description:</label>
                     <textarea id="scheduleDescription" name="description"></textarea>
                 </div>
-                <div class="form-group">
-                    <label for="scheduleStaff">Staff Members:</label>
-                    <textarea id="scheduleStaff" name="staff" placeholder="Enter staff names, one per line"></textarea>
+                <div class="selection-section">
+                    <div class="selection-title">Staff Members:</div>
+                    <div class="selection-grid" id="staffSelection">
+                        <!-- Staff options will be populated here -->
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label for="scheduleParticipants">Participants:</label>
-                    <textarea id="scheduleParticipants" name="participants" placeholder="Enter participant names, one per line"></textarea>
+                <div class="selection-section">
+                    <div class="selection-title">Participants:</div>
+                    <div class="selection-grid" id="participantSelection">
+                        <!-- Participant options will be populated here -->
+                    </div>
                 </div>
                 <button type="submit" class="btn btn-primary">Create Schedule</button>
             </form>
@@ -508,11 +556,70 @@ const createMainPage = () => {
     </div>
     
     <script>
+        // Predefined staff and participants
+        const staffMembers = [
+            'Sarah Johnson',
+            'Mike Chen',
+            'Emma Wilson',
+            'David Rodriguez',
+            'Lisa Thompson',
+            'James Park',
+            'Rachel Green',
+            'Tom Anderson'
+        ];
+        
+        const participants = [
+            'Alex Smith',
+            'Jordan Taylor',
+            'Casey Brown',
+            'Morgan Davis',
+            'Riley Johnson',
+            'Avery Wilson',
+            'Quinn Martinez',
+            'Sage Thompson',
+            'River Chen',
+            'Phoenix Garcia'
+        ];
+        
         // Set today's date as default
         document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
         
+        // Initialize selection grids
+        function initializeSelections() {
+            const staffGrid = document.getElementById('staffSelection');
+            const participantGrid = document.getElementById('participantSelection');
+            
+            // Create staff selection items
+            staffGrid.innerHTML = staffMembers.map(staff => \`
+                <div class="selection-item" onclick="toggleSelection(this, 'staff')">
+                    <input type="checkbox" id="staff-\${staff.replace(/\\s+/g, '-').toLowerCase()}" name="staff" value="\${staff}">
+                    <label for="staff-\${staff.replace(/\\s+/g, '-').toLowerCase()}">\${staff}</label>
+                </div>
+            \`).join('');
+            
+            // Create participant selection items
+            participantGrid.innerHTML = participants.map(participant => \`
+                <div class="selection-item" onclick="toggleSelection(this, 'participant')">
+                    <input type="checkbox" id="participant-\${participant.replace(/\\s+/g, '-').toLowerCase()}" name="participant" value="\${participant}">
+                    <label for="participant-\${participant.replace(/\\s+/g, '-').toLowerCase()}">\${participant}</label>
+                </div>
+            \`).join('');
+        }
+        
+        function toggleSelection(element, type) {
+            const checkbox = element.querySelector('input[type="checkbox"]');
+            checkbox.checked = !checkbox.checked;
+            
+            if (checkbox.checked) {
+                element.classList.add('selected');
+            } else {
+                element.classList.remove('selected');
+            }
+        }
+        
         function openCreateModal() {
             document.getElementById('createModal').style.display = 'block';
+            initializeSelections();
         }
         
         function openViewModal() {
@@ -539,12 +646,16 @@ const createMainPage = () => {
             e.preventDefault();
             
             const formData = new FormData(e.target);
+            // Get selected staff and participants
+            const selectedStaff = Array.from(document.querySelectorAll('input[name="staff"]:checked')).map(cb => cb.value);
+            const selectedParticipants = Array.from(document.querySelectorAll('input[name="participant"]:checked')).map(cb => cb.value);
+            
             const scheduleData = {
                 title: formData.get('title'),
                 date: formData.get('date'),
                 description: formData.get('description'),
-                staff: formData.get('staff').split('\\n').filter(s => s.trim()),
-                participants: formData.get('participants').split('\\n').filter(s => s.trim())
+                staff: selectedStaff,
+                participants: selectedParticipants
             };
             
             try {
@@ -561,6 +672,11 @@ const createMainPage = () => {
                     closeModal('createModal');
                     e.target.reset();
                     document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+                    // Reset selections
+                    document.querySelectorAll('.selection-item').forEach(item => {
+                        item.classList.remove('selected');
+                        item.querySelector('input[type="checkbox"]').checked = false;
+                    });
                 } else {
                     alert('Error creating schedule');
                 }
