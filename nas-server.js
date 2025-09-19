@@ -2,6 +2,7 @@ const { createServer } = require('http');
 const { parse } = require('url');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 
 // Simple HTTP server for serving the React Native Web build
 const PORT = process.env.PORT || 3000;
