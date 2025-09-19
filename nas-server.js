@@ -58,7 +58,7 @@ function startServer() {
   
   // Try bun first (preferred for this project)
   console.log('Attempting to start with bun...');
-  const bunProcess = spawn('bun', ['run', 'start-web'], {
+  const bunProcess = spawn('bunx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
     stdio: 'inherit',
     env: env,
     cwd: __dirname
@@ -67,8 +67,8 @@ function startServer() {
   bunProcess.on('error', (err) => {
     console.log('❌ Bun failed, trying npm...');
     
-    // Fallback to npm
-    const npmProcess = spawn('npm', ['run', 'start-web'], {
+    // Fallback to npx
+    const npmProcess = spawn('npx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
       stdio: 'inherit',
       env: env,
       cwd: __dirname
