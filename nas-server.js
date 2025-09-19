@@ -570,7 +570,8 @@ const htmlTemplate = `
                     
                     <div class="access-info">
                         <strong>Network Access:</strong><br>
-                        Use <strong>http://[YOUR-NAS-IP]:${PORT}</strong> from any device on your network<br><br>
+                        • Local: <strong>http://[YOUR-NAS-IP]:${PORT}</strong><br>
+                        • External: <strong>http://[YOUR-PUBLIC-IP]:${PORT}</strong> (requires port forwarding)<br><br>
                         <a href="/app" style="display: inline-block; background: #667eea; color: white; padding: 0.75rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 500; margin-top: 0.5rem;">🚀 Launch App</a>
                     </div>
                 </div>
@@ -600,6 +601,11 @@ const server = createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  // Basic security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
   
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
