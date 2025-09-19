@@ -50,19 +50,23 @@ export default function CreateScheduleScreen() {
   const [finalChecklistStaff, setFinalChecklistStaff] = useState<string>('');
 
   const toggleStaffSelection = (staffId: string) => {
-    setWorkingStaff(prev => 
-      prev.includes(staffId) 
+    setWorkingStaff(prev => {
+      const newSelection = prev.includes(staffId) 
         ? prev.filter(id => id !== staffId)
-        : [...prev, staffId]
-    );
+        : [...prev, staffId];
+      console.log('Staff selection updated:', newSelection.map(id => staff.find(s => s.id === id)?.name).join(', '));
+      return newSelection;
+    });
   };
 
   const toggleParticipantSelection = (participantId: string) => {
-    setAttendingParticipants(prev => 
-      prev.includes(participantId) 
+    setAttendingParticipants(prev => {
+      const newSelection = prev.includes(participantId) 
         ? prev.filter(id => id !== participantId)
-        : [...prev, participantId]
-    );
+        : [...prev, participantId];
+      console.log('Participant selection updated:', newSelection.map(id => participants.find(p => p.id === participantId)?.name).join(', '));
+      return newSelection;
+    });
   };
 
   const handleBackStep = useCallback(() => {

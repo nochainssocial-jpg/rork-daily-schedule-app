@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, Share as RNShare, TextInput, ActivityIndicator } from 'react-native';
-import { Hash, Download, Copy } from 'lucide-react-native';
+import { Hash, Download, Copy, FileText, Mail } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSchedule } from '@/hooks/schedule-store';
 import ActionButtons from '@/components/ActionButtons';
 import { router } from 'expo-router';
 
 export default function ShareScreen() {
-  const { selectedDate, getScheduleForDate, staff, shareScheduleWithCode, importScheduleWithCode, setScheduleStep, schedules, updateScheduleImmediately } = useSchedule();
+  const { selectedDate, getScheduleForDate, staff, participants, shareScheduleWithCode, importScheduleWithCode, setScheduleStep, schedules, updateScheduleImmediately } = useSchedule();
   const insets = useSafeAreaInsets();
   const schedule = getScheduleForDate(selectedDate);
   
@@ -97,6 +97,159 @@ export default function ShareScreen() {
     router.push('/share-schedule');
   };
 
+  const generateScheduleText = () => {
+    if (!schedule) return '';
+
+    let scheduleText = `DAILY SCHEDULE - ${(() => {
+      const [year, month, day] = selectedDate.split('-');
+      return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+    })()}\n`;
+    scheduleText += `${'='.repeat(50)}\n\n`;
+
+    // Staff Working Today
+    scheduleText += `1. STAFF WORKING TODAY\n`;
+    scheduleText += `${'-'.repeat(25)}\n`;
+    if (schedule.workingStaff && schedule.workingStaff.length > 0) {
+      schedule.workingStaff.forEach((staffId) => {
+        const staffMember = staff.find(s => s.id === staffId);
+        scheduleText += `• ${staffMember?.name || 'Unknown'}\n`;
+      });
+    } else {
+      scheduleText += `No staff assigned\n`;
+    }
+    scheduleText += `\n`;
+
+    // Participants Attending Today
+    scheduleText += `2. PARTICIPANTS ATTENDING TODAY\n`;
+    scheduleText += `${'-'.repeat(32)}\n`;
+    if (schedule.attendingParticipants && schedule.attendingParticipants.length > 0) {
+      schedule.attendingParticipants.forEach((participantId) => {
+        const participant = participants.find((p: any) => p.id === participantId);
+        scheduleText += `• ${participant?.name || 'Unknown'}\n`;
+      });
+    } else {
+      scheduleText += `No participants assigned\n`;
+    }
+    scheduleText += `\n`;
+
+    return scheduleText;
+  };
+
+  const shareAsPDF = async () => {
+    if (!schedule) {
+      Alert.alert('No Schedule', 'No schedule available to share as PDF');
+      return;
+    }
+
+    try {
+      const scheduleText = generateScheduleText();
+      
+      if (Platform.OS === 'web') {
+        // Generate HTML for PDF printing
+        const generatePrintHTML = () => {
+          const formatDate = () => {
+            const [year, month, day] = selectedDate.split('-');
+            return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+          };
+
+          const pageStyle = `
+            <style>
+              @page { margin: 20mm; size: A4; }
+              body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; margin: 0; padding: 20px; }
+              .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+              .title { font-size: 24px; font-weight: bold; margin: 0; }
+              .date { font-size: 16px; color: #666; margin: 5px 0 0 0; }
+              .section { margin: 20px 0; }
+              .section-title { font-size: 16px; font-weight: bold; color: #007AFF; margin-bottom: 10px; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
+              .item { margin: 5px 0; padding-left: 10px; }
+              .staff-group { margin: 10px 0; padding: 10px; background-color: #f9f9f9; border-left: 4px solid #007AFF; }
+              .staff-name { font-weight: bold; color: #007AFF; margin-bottom: 5px; }
+              pre { white-space: pre-wrap; font-family: Arial, sans-serif; }
+            </style>
+          `;
+
+          return `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Daily Schedule - ${formatDate()}</title>
+              ${pageStyle}
+            </head>
+            <body>
+              <div class="header">
+                <h1 class="title">Daily Schedule</h1>
+                <p class="date">${formatDate()}</p>
+              </div>
+              <pre>${scheduleText}</pre>
+            </body>
+            </html>
+          `;
+        };
+
+        // Create and open print window
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+          printWindow.document.write(generatePrintHTML());
+          printWindow.document.close();
+          
+          // Wait for content to load then show print dialog
+          printWindow.onload = () => {
+            setTimeout(() => {
+              printWindow.print();
+            }, 500);
+          };
+        } else {
+          Alert.alert('PDF Error', 'Unable to open print window. Please check your browser settings.');
+        }
+      } else {
+        // For mobile, share as text with PDF mention
+        await RNShare.share({
+          message: `${scheduleText}\n\n(To save as PDF, open this on a computer and use the print function)`,
+          title: `Daily Schedule - ${(() => {
+            const [year, month, day] = selectedDate.split('-');
+            return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+          })()}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing as PDF:', error);
+      Alert.alert('Error', 'Unable to share schedule as PDF. Please try again.');
+    }
+  };
+
+  const shareViaEmail = async () => {
+    if (!schedule) {
+      Alert.alert('No Schedule', 'No schedule available to share via email');
+      return;
+    }
+
+    try {
+      const scheduleText = generateScheduleText();
+      const subject = `Daily Schedule - ${(() => {
+        const [year, month, day] = selectedDate.split('-');
+        return `${day.padStart(2, '0')}/${month.padStart(2, '0')}/${year}`;
+      })()}`;
+      
+      const emailBody = `Please find the daily schedule below:\n\n${scheduleText}`;
+      
+      if (Platform.OS === 'web') {
+        // Open default email client
+        const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+        window.open(mailtoLink);
+      } else {
+        // Use share API for mobile
+        await RNShare.share({
+          message: emailBody,
+          title: subject,
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing via email:', error);
+      Alert.alert('Error', 'Unable to share schedule via email. Please try again.');
+    }
+  };
+
   const loadLastSchedule = async () => {
     console.log('Loading last created schedule...');
     
@@ -157,6 +310,32 @@ export default function ShareScreen() {
       </View>
 
       <ScrollView style={styles.scrollView}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Share Options</Text>
+          
+          {schedule && (
+            <View style={styles.shareOptionsGrid}>
+              <TouchableOpacity 
+                style={styles.shareOptionCard}
+                onPress={shareAsPDF}
+              >
+                <FileText size={24} color="#FF6B6B" />
+                <Text style={styles.shareOptionTitle}>Export as PDF</Text>
+                <Text style={styles.shareOptionDesc}>Print or save as PDF document</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.shareOptionCard}
+                onPress={shareViaEmail}
+              >
+                <Mail size={24} color="#4CAF50" />
+                <Text style={styles.shareOptionTitle}>Share via Email</Text>
+                <Text style={styles.shareOptionDesc}>Send schedule via email</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Generate Sharing Code</Text>
           <Text style={styles.date}>{(() => {
@@ -327,6 +506,34 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  shareOptionsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  shareOptionCard: {
+    flex: 1,
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  shareOptionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginTop: 8,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  shareOptionDesc: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 16,
   },
   shareButton: {
     flexDirection: 'row',
