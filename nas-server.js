@@ -27,10 +27,10 @@ function checkProjectFiles() {
   return true;
 }
 
-// Check if Expo CLI is available
-function checkExpoCLI() {
+// Check if bun is available
+function checkBun() {
   return new Promise((resolve) => {
-    const checkProcess = spawn('npx', ['expo', '--version'], {
+    const checkProcess = spawn('bun', ['--version'], {
       stdio: 'pipe'
     });
     
@@ -44,46 +44,65 @@ function checkExpoCLI() {
   });
 }
 
-// Start the Expo development server
-function startExpoServer() {
-  console.log('🚀 Starting Expo development server...');
+// Try different server approaches
+function startServer() {
+  console.log('🚀 Starting development server...');
   
-  // Set environment variables for production-like behavior
+  // Set environment variables
   const env = {
     ...process.env,
     NODE_ENV: 'development',
-    EXPO_USE_FAST_RESOLVER: 'true',
-    EXPO_USE_METRO_WORKSPACE_ROOT: 'true'
+    PORT: PORT.toString(),
+    HOST: HOST
   };
   
-  // Start Expo with web platform
-  const expoProcess = spawn('npx', ['expo', 'start', '--web', '--port', PORT.toString(), '--host', HOST], {
+  // Try bun first (preferred for this project)
+  console.log('Attempting to start with bun...');
+  const bunProcess = spawn('bun', ['run', 'start-web'], {
     stdio: 'inherit',
     env: env,
     cwd: __dirname
   });
   
-  expoProcess.on('error', (err) => {
-    console.error('❌ Failed to start Expo server:', err?.message || 'Unknown error');
-    console.log('\n💡 Troubleshooting tips:');
-    console.log('   • Make sure you have Expo CLI installed: npm install -g @expo/cli');
-    console.log('   • Check if all dependencies are installed: npm install');
-    console.log('   • Verify the project structure is correct');
-    process.exit(1);
+  bunProcess.on('error', (err) => {
+    console.log('❌ Bun failed, trying npm...');
+    
+    // Fallback to npm
+    const npmProcess = spawn('npm', ['run', 'start-web'], {
+      stdio: 'inherit',
+      env: env,
+      cwd: __dirname
+    });
+    
+    npmProcess.on('error', (err2) => {
+      console.error('❌ Both bun and npm failed to start the server');
+      console.log('\n💡 Troubleshooting tips:');
+      console.log('   • Make sure you have either bun or npm installed');
+      console.log('   • Check if all dependencies are installed: bun install or npm install');
+      console.log('   • Verify the project structure is correct');
+      process.exit(1);
+    });
+    
+    npmProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error(`❌ Server exited with code ${code}`);
+      }
+      process.exit(code);
+    });
   });
   
-  expoProcess.on('close', (code) => {
+  bunProcess.on('close', (code) => {
     if (code !== 0) {
-      console.error(`❌ Expo server exited with code ${code}`);
+      console.error(`❌ Server exited with code ${code}`);
     }
     process.exit(code);
   });
   
-  return expoProcess;
+  return bunProcess;
 }
 
 // Main startup function
-async function startServer() {
+async function startApp() {
   console.log('\n================================');
   console.log('    Daily Schedule App Starter   ');
   console.log('       for Synology NAS          ');
@@ -97,36 +116,14 @@ async function startServer() {
   
   console.log('✅ Project files found');
   
-  // Check if Expo CLI is available
-  console.log('🔍 Checking Expo CLI...');
-  const hasExpoCLI = await checkExpoCLI();
+  // Check if bun is available (preferred but not required)
+  console.log('🔍 Checking runtime...');
+  const hasBun = await checkBun();
   
-  if (!hasExpoCLI) {
-    console.error('❌ Expo CLI not found. Installing...');
-    
-    // Try to install Expo CLI
-    const installProcess = spawn('npm', ['install', '-g', '@expo/cli'], {
-      stdio: 'inherit'
-    });
-    
-    await new Promise((resolve, reject) => {
-      installProcess.on('close', (code) => {
-        if (code === 0) {
-          console.log('✅ Expo CLI installed successfully');
-          resolve(true);
-        } else {
-          console.error('❌ Failed to install Expo CLI');
-          reject(new Error('Expo CLI installation failed'));
-        }
-      });
-      
-      installProcess.on('error', (err) => {
-        console.error('❌ Error installing Expo CLI:', err?.message || 'Unknown error');
-        reject(err);
-      });
-    });
+  if (hasBun) {
+    console.log('✅ Bun found (preferred)');
   } else {
-    console.log('✅ Expo CLI found');
+    console.log('⚠️  Bun not found, will try npm as fallback');
   }
   
   // Check if dependencies are installed
@@ -134,7 +131,11 @@ async function startServer() {
   if (!fs.existsSync(path.join(__dirname, 'node_modules'))) {
     console.log('📦 Installing dependencies...');
     
-    const installProcess = spawn('npm', ['install'], {
+    // Try bun first, fallback to npm
+    const installCommand = hasBun ? 'bun' : 'npm';
+    const installArgs = hasBun ? ['install'] : ['install'];
+    
+    const installProcess = spawn(installCommand, installArgs, {
       stdio: 'inherit',
       cwd: __dirname
     });
@@ -169,10 +170,10 @@ async function startServer() {
   console.log('   • Replace [YOUR-NAS-IP] with your actual NAS IP address');
   console.log('   • Make sure port 3000 is open in your NAS firewall');
   console.log('   • Press Ctrl+C to stop the server');
-  console.log('\n🔄 Starting Expo development server...\n');
+  console.log('\n🔄 Starting development server...\n');
   
-  // Start the Expo server
-  startExpoServer();
+  // Start the server
+  startServer();
 }
 
 // Graceful shutdown
@@ -188,8 +189,8 @@ process.on('SIGTERM', () => {
   process.exit(0);
 });
 
-// Start the server
-startServer().catch((err) => {
+// Start the app
+startApp().catch((err) => {
   console.error('❌ Failed to start server:', err?.message || 'Unknown error');
   process.exit(1);
 });
