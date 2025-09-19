@@ -614,15 +614,12 @@ const server = createServer((req, res) => {
     return;
   }
 
-  // Serve the main page
-  if (pathname === '/' || pathname === '/index.html') {
-    res.writeHead(200, { 'Content-Type': 'text/html' });
-    res.end(htmlTemplate);
-    return;
-  }
-
-  // Serve the actual React Native Web app
-  if (pathname === '/app') {
+  // Serve the React Native Web app for all routes (SPA routing)
+  if (pathname === '/' || pathname === '/index.html' || pathname.startsWith('/app') || 
+      pathname.startsWith('/(tabs)') || pathname.includes('schedule') || 
+      pathname.includes('dropoffs') || pathname.includes('settings') || 
+      pathname.includes('help') || pathname.includes('share') || 
+      pathname.includes('view-pdf')) {
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(getReactNativeWebApp());
     return;
