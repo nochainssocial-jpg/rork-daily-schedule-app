@@ -53,12 +53,12 @@ function startServer() {
     ...process.env,
     NODE_ENV: 'development',
     PORT: PORT.toString(),
-    HOST: HOST
+    EXPO_DEVTOOLS_LISTEN_ADDRESS: '0.0.0.0'
   };
   
   // Try bun first (preferred for this project)
   console.log('Attempting to start with bun...');
-  const bunProcess = spawn('bunx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
+  const bunProcess = spawn('bun', ['run', 'dev'], {
     stdio: 'inherit',
     env: env,
     cwd: projectDir
@@ -67,8 +67,8 @@ function startServer() {
   bunProcess.on('error', (err) => {
     console.log('❌ Bun failed, trying npm...');
     
-    // Fallback to npx
-    const npmProcess = spawn('npx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
+    // Fallback to npm
+    const npmProcess = spawn('npm', ['run', 'dev'], {
       stdio: 'inherit',
       env: env,
       cwd: projectDir
