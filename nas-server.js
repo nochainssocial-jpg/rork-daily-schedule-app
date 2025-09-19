@@ -44,45 +44,39 @@ function checkBun() {
   });
 }
 
-// Start the server directly with Node.js
+// Start Expo web server directly
 function startServer() {
-  console.log('🚀 Starting server with Node.js...');
+  console.log('🚀 Starting Expo web server...');
   
   // Set environment variables
   const env = {
     ...process.env,
     NODE_ENV: 'production',
-    PORT: PORT.toString(),
-    HOST: HOST
+    EXPO_USE_FAST_RESOLVER: 'true',
+    EXPO_NO_TELEMETRY: '1'
   };
   
-  // Check if server.js exists
-  const serverPath = path.join(projectDir, 'server.js');
-  if (!fs.existsSync(serverPath)) {
-    console.error('❌ server.js not found. Please ensure the server file exists.');
-    process.exit(1);
-  }
-  
-  // Start the Node.js server directly
-  console.log('Starting Node.js server...');
-  const serverProcess = spawn('node', ['server.js'], {
+  // Start Expo web server directly
+  console.log('🌐 Starting Expo web development server...');
+  const serverProcess = spawn('npx', ['expo', 'start', '--web', '--port', PORT.toString(), '--host', HOST], {
     stdio: 'inherit',
     env: env,
     cwd: projectDir
   });
   
   serverProcess.on('error', (err) => {
-    console.error('❌ Failed to start Node.js server:', err.message);
+    console.error('❌ Failed to start Expo server:', err.message);
     console.log('\n💡 Troubleshooting tips:');
     console.log('   • Make sure Node.js is installed');
     console.log('   • Check if all dependencies are installed: npm install');
-    console.log('   • Verify server.js exists in the project directory');
+    console.log('   • Try running: npx expo install --fix');
+    console.log('   • Make sure Expo CLI is available: npm install -g @expo/cli');
     process.exit(1);
   });
   
   serverProcess.on('close', (code) => {
     if (code !== 0) {
-      console.error(`❌ Server exited with code ${code}`);
+      console.error(`❌ Expo server exited with code ${code}`);
     }
     process.exit(code);
   });
@@ -149,37 +143,8 @@ async function startApp() {
     console.log('✅ Dependencies found');
   }
   
-  // Check if dist directory exists, if not, run build
-  console.log('🏗️ Checking build files...');
-  const distDir = path.join(projectDir, 'dist');
-  if (!fs.existsSync(distDir) || !fs.existsSync(path.join(distDir, 'index.html'))) {
-    console.log('📦 Building app for production...');
-    
-    // Run the build script
-    const buildProcess = spawn('bash', ['build.sh'], {
-      stdio: 'inherit',
-      cwd: projectDir
-    });
-    
-    await new Promise((resolve, reject) => {
-      buildProcess.on('close', (code) => {
-        if (code === 0) {
-          console.log('✅ Build completed successfully');
-          resolve(true);
-        } else {
-          console.error('❌ Build failed');
-          reject(new Error('Build process failed'));
-        }
-      });
-      
-      buildProcess.on('error', (err) => {
-        console.error('❌ Error during build:', err?.message || 'Unknown error');
-        reject(err);
-      });
-    });
-  } else {
-    console.log('✅ Build files found');
-  }
+  // Skip build process - we'll run Expo directly
+  console.log('🏗️ Skipping build - will run Expo web server directly');
   
   console.log('\n🚀 Starting Daily Schedule App...');
   console.log('────────────────────────────────────────');
