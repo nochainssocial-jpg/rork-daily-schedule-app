@@ -465,11 +465,44 @@ export default function HomeScreen() {
               <View style={styles.noScheduleContainer}>
                 <Text style={styles.noScheduleText}>No schedule created for today</Text>
                 <Text style={styles.noScheduleSubtext}>Create a schedule to view and manage categories</Text>
+                
+                {/* Quick Start Guide */}
+                <View style={styles.quickStartGuide}>
+                  <Text style={styles.quickStartTitle}>Quick Start Guide:</Text>
+                  <View style={styles.quickStartStep}>
+                    <Text style={styles.quickStartNumber}>1.</Text>
+                    <Text style={styles.quickStartText}>Tap &quot;Create&quot; to start a new schedule</Text>
+                  </View>
+                  <View style={styles.quickStartStep}>
+                    <Text style={styles.quickStartNumber}>2.</Text>
+                    <Text style={styles.quickStartText}>Select working staff and attending participants</Text>
+                  </View>
+                  <View style={styles.quickStartStep}>
+                    <Text style={styles.quickStartNumber}>3.</Text>
+                    <Text style={styles.quickStartText}>Assign participants to staff members</Text>
+                  </View>
+                  <View style={styles.quickStartStep}>
+                    <Text style={styles.quickStartNumber}>4.</Text>
+                    <Text style={styles.quickStartText}>Complete the 5-step wizard</Text>
+                  </View>
+                </View>
+                
                 {schedules.length > 0 ? (
-                  <Text style={styles.loadHintText}>Use Load button to copy your most recent schedule</Text>
+                  <Text style={styles.loadHintText}>Or use &quot;Load&quot; button to copy your most recent schedule</Text>
                 ) : (
-                  <Text style={styles.loadHintText}>Use Refresh button to check for existing schedules</Text>
+                  <Text style={styles.loadHintText}>Use &quot;Refresh&quot; button to check for existing schedules</Text>
                 )}
+                
+                {/* Feature Overview */}
+                <View style={styles.featureOverview}>
+                  <Text style={styles.featureTitle}>App Features:</Text>
+                  <Text style={styles.featureItem}>✓ Staff & Participant Management</Text>
+                  <Text style={styles.featureItem}>✓ Time Slot Assignments</Text>
+                  <Text style={styles.featureItem}>✓ Chore Distribution</Text>
+                  <Text style={styles.featureItem}>✓ Drop-off & Pickup Coordination</Text>
+                  <Text style={styles.featureItem}>✓ PDF Export & Sharing</Text>
+                  <Text style={styles.featureItem}>✓ 6-digit Code Sharing</Text>
+                </View>
                 
                 {/* Debug info for development */}
                 {__DEV__ && (
@@ -648,6 +681,61 @@ const styles = StyleSheet.create({
     marginVertical: 20,
     marginHorizontal: 20,
     borderRadius: 10,
+  },
+  quickStartGuide: {
+    backgroundColor: '#F0F8FF',
+    padding: 20,
+    borderRadius: 10,
+    marginTop: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E3F2FD',
+  },
+  quickStartTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#1976D2',
+    marginBottom: 12,
+    textAlign: 'center' as const,
+  },
+  quickStartStep: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  quickStartNumber: {
+    fontSize: 14,
+    fontWeight: '600' as const,
+    color: '#1976D2',
+    width: 20,
+  },
+  quickStartText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+    lineHeight: 20,
+  },
+  featureOverview: {
+    backgroundColor: '#F8F9FA',
+    padding: 20,
+    borderRadius: 10,
+    marginTop: 20,
+    width: '100%',
+    borderWidth: 1,
+    borderColor: '#E9ECEF',
+  },
+  featureTitle: {
+    fontSize: 16,
+    fontWeight: '600' as const,
+    color: '#495057',
+    marginBottom: 12,
+    textAlign: 'center' as const,
+  },
+  featureItem: {
+    fontSize: 14,
+    color: '#495057',
+    marginBottom: 6,
+    paddingLeft: 10,
   },
   noScheduleText: {
     fontSize: 18,
