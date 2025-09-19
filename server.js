@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Get current directory
-const __dirname = process.cwd();
+const currentDir = process.cwd();
 
 // Import the Hono app (we'll need to transpile TypeScript)
 const { Hono } = require('hono');
@@ -16,7 +16,7 @@ const app = new Hono();
 app.use('*', cors());
 
 // Serve static files from a dist or build directory if it exists
-const staticDir = path.join(__dirname, 'dist');
+const staticDir = path.join(currentDir, 'dist');
 if (fs.existsSync(staticDir)) {
   app.use('/*', serveStatic({ root: './dist' }));
 }
@@ -28,7 +28,7 @@ app.get('/api', (c) => {
 
 // Fallback for SPA routing
 app.get('*', (c) => {
-  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  const indexPath = path.join(currentDir, 'dist', 'index.html');
   if (fs.existsSync(indexPath)) {
     return c.html(fs.readFileSync(indexPath, 'utf8'));
   }
