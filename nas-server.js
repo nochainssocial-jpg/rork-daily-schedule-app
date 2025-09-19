@@ -58,7 +58,7 @@ function startServer() {
   
   // Try bun first (preferred for this project)
   console.log('Attempting to start with bun...');
-  const bunProcess = spawn('bun', ['run', 'dev'], {
+  const bunProcess = spawn('bun', ['run', 'start'], {
     stdio: 'inherit',
     env: env,
     cwd: projectDir
@@ -68,7 +68,7 @@ function startServer() {
     console.log('❌ Bun failed, trying npm...');
     
     // Fallback to npm
-    const npmProcess = spawn('npm', ['run', 'dev'], {
+    const npmProcess = spawn('npm', ['run', 'start'], {
       stdio: 'inherit',
       env: env,
       cwd: projectDir
