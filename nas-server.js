@@ -2,8 +2,8 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Get __dirname equivalent for CommonJS
-const __dirname = process.cwd();
+// Use current working directory
+const projectDir = process.cwd();
 
 // Configuration
 const PORT = process.env.PORT || 3000;
@@ -18,7 +18,7 @@ function checkProjectFiles() {
   ];
   
   for (const file of requiredFiles) {
-    if (!fs.existsSync(path.join(__dirname, file))) {
+    if (!fs.existsSync(path.join(projectDir, file))) {
       console.error(`❌ Missing required file: ${file}`);
       return false;
     }
@@ -61,7 +61,7 @@ function startServer() {
   const bunProcess = spawn('bunx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
     stdio: 'inherit',
     env: env,
-    cwd: __dirname
+    cwd: projectDir
   });
   
   bunProcess.on('error', (err) => {
@@ -71,7 +71,7 @@ function startServer() {
     const npmProcess = spawn('npx', ['rork', 'start', '-p', 'r0zofc8p3enybeuldw19k', '--web', '--host', HOST, '--port', PORT.toString()], {
       stdio: 'inherit',
       env: env,
-      cwd: __dirname
+      cwd: projectDir
     });
     
     npmProcess.on('error', (err2) => {
@@ -128,7 +128,7 @@ async function startApp() {
   
   // Check if dependencies are installed
   console.log('📦 Checking dependencies...');
-  if (!fs.existsSync(path.join(__dirname, 'node_modules'))) {
+  if (!fs.existsSync(path.join(projectDir, 'node_modules'))) {
     console.log('📦 Installing dependencies...');
     
     // Try bun first, fallback to npm
@@ -137,7 +137,7 @@ async function startApp() {
     
     const installProcess = spawn(installCommand, installArgs, {
       stdio: 'inherit',
-      cwd: __dirname
+      cwd: projectDir
     });
     
     await new Promise((resolve, reject) => {
