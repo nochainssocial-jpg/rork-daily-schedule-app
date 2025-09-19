@@ -543,8 +543,8 @@ const createMainPage = () => {
                 title: formData.get('title'),
                 date: formData.get('date'),
                 description: formData.get('description'),
-                staff: formData.get('staff').split('\n').filter(s => s.trim()),
-                participants: formData.get('participants').split('\n').filter(s => s.trim())
+                staff: formData.get('staff').split('\\n').filter(s => s.trim()),
+                participants: formData.get('participants').split('\\n').filter(s => s.trim())
             };
             
             try {
@@ -581,16 +581,16 @@ const createMainPage = () => {
                     return;
                 }
                 
-                schedulesList.innerHTML = schedules.map(schedule => `
+                schedulesList.innerHTML = schedules.map(schedule => \`
                     <div class="schedule-item">
-                        <h4>${schedule.title}</h4>
-                        <p><strong>Date:</strong> ${new Date(schedule.date).toLocaleDateString()}</p>
-                        <p><strong>Description:</strong> ${schedule.description || 'No description'}</p>
-                        <p><strong>Staff:</strong> ${schedule.staff.join(', ') || 'None specified'}</p>
-                        <p><strong>Participants:</strong> ${schedule.participants.join(', ') || 'None specified'}</p>
-                        <p><strong>Created:</strong> ${new Date(schedule.createdAt).toLocaleString()}</p>
+                        <h4>\${schedule.title}</h4>
+                        <p><strong>Date:</strong> \${new Date(schedule.date).toLocaleDateString()}</p>
+                        <p><strong>Description:</strong> \${schedule.description || 'No description'}</p>
+                        <p><strong>Staff:</strong> \${schedule.staff.join(', ') || 'None specified'}</p>
+                        <p><strong>Participants:</strong> \${schedule.participants.join(', ') || 'None specified'}</p>
+                        <p><strong>Created:</strong> \${new Date(schedule.createdAt).toLocaleString()}</p>
                     </div>
-                `).join('');
+                \`).join('');
             } catch (error) {
                 document.getElementById('schedulesList').innerHTML = '<p>Error loading schedules: ' + error.message + '</p>';
             }
