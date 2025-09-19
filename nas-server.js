@@ -44,61 +44,50 @@ function checkBun() {
   });
 }
 
-// Try different server approaches
+// Start the server directly with Node.js
 function startServer() {
-  console.log('🚀 Starting development server...');
+  console.log('🚀 Starting server with Node.js...');
   
   // Set environment variables
   const env = {
     ...process.env,
-    NODE_ENV: 'development',
+    NODE_ENV: 'production',
     PORT: PORT.toString(),
-    EXPO_DEVTOOLS_LISTEN_ADDRESS: '0.0.0.0'
+    HOST: HOST
   };
   
-  // Try bun first (preferred for this project)
-  console.log('Attempting to start with bun...');
-  const bunProcess = spawn('bun', ['run', 'start'], {
+  // Check if server.js exists
+  const serverPath = path.join(projectDir, 'server.js');
+  if (!fs.existsSync(serverPath)) {
+    console.error('❌ server.js not found. Please ensure the server file exists.');
+    process.exit(1);
+  }
+  
+  // Start the Node.js server directly
+  console.log('Starting Node.js server...');
+  const serverProcess = spawn('node', ['server.js'], {
     stdio: 'inherit',
     env: env,
     cwd: projectDir
   });
   
-  bunProcess.on('error', (err) => {
-    console.log('❌ Bun failed, trying npm...');
-    
-    // Fallback to npm
-    const npmProcess = spawn('npm', ['run', 'start'], {
-      stdio: 'inherit',
-      env: env,
-      cwd: projectDir
-    });
-    
-    npmProcess.on('error', (err2) => {
-      console.error('❌ Both bun and npm failed to start the server');
-      console.log('\n💡 Troubleshooting tips:');
-      console.log('   • Make sure you have either bun or npm installed');
-      console.log('   • Check if all dependencies are installed: bun install or npm install');
-      console.log('   • Verify the project structure is correct');
-      process.exit(1);
-    });
-    
-    npmProcess.on('close', (code) => {
-      if (code !== 0) {
-        console.error(`❌ Server exited with code ${code}`);
-      }
-      process.exit(code);
-    });
+  serverProcess.on('error', (err) => {
+    console.error('❌ Failed to start Node.js server:', err.message);
+    console.log('\n💡 Troubleshooting tips:');
+    console.log('   • Make sure Node.js is installed');
+    console.log('   • Check if all dependencies are installed: npm install');
+    console.log('   • Verify server.js exists in the project directory');
+    process.exit(1);
   });
   
-  bunProcess.on('close', (code) => {
+  serverProcess.on('close', (code) => {
     if (code !== 0) {
       console.error(`❌ Server exited with code ${code}`);
     }
     process.exit(code);
   });
   
-  return bunProcess;
+  return serverProcess;
 }
 
 // Main startup function
@@ -158,6 +147,38 @@ async function startApp() {
     });
   } else {
     console.log('✅ Dependencies found');
+  }
+  
+  // Check if dist directory exists, if not, run build
+  console.log('🏗️ Checking build files...');
+  const distDir = path.join(projectDir, 'dist');
+  if (!fs.existsSync(distDir) || !fs.existsSync(path.join(distDir, 'index.html'))) {
+    console.log('📦 Building app for production...');
+    
+    // Run the build script
+    const buildProcess = spawn('bash', ['build.sh'], {
+      stdio: 'inherit',
+      cwd: projectDir
+    });
+    
+    await new Promise((resolve, reject) => {
+      buildProcess.on('close', (code) => {
+        if (code === 0) {
+          console.log('✅ Build completed successfully');
+          resolve(true);
+        } else {
+          console.error('❌ Build failed');
+          reject(new Error('Build process failed'));
+        }
+      });
+      
+      buildProcess.on('error', (err) => {
+        console.error('❌ Error during build:', err?.message || 'Unknown error');
+        reject(err);
+      });
+    });
+  } else {
+    console.log('✅ Build files found');
   }
   
   console.log('\n🚀 Starting Daily Schedule App...');
