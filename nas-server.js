@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 
-// Use current working directory
+// Use current working directory (avoiding __dirname conflicts)
 const projectDir = process.cwd();
 
 // Configuration
