@@ -314,24 +314,37 @@ export default function ShareScreen() {
           <Text style={styles.sectionTitle}>Share Options</Text>
           
           {schedule && (
-            <View style={styles.shareOptionsGrid}>
+            <View style={styles.shareOptionsContainer}>
               <TouchableOpacity 
-                style={styles.shareOptionCard}
+                style={styles.primaryShareOption}
                 onPress={shareAsPDF}
               >
-                <FileText size={24} color="#FF6B6B" />
-                <Text style={styles.shareOptionTitle}>Export as PDF</Text>
-                <Text style={styles.shareOptionDesc}>Print or save as PDF document</Text>
+                <FileText size={32} color="white" />
+                <Text style={styles.primaryShareTitle}>Export as PDF</Text>
+                <Text style={styles.primaryShareDesc}>Print or save as PDF document with full formatting</Text>
               </TouchableOpacity>
               
-              <TouchableOpacity 
-                style={styles.shareOptionCard}
-                onPress={shareViaEmail}
-              >
-                <Mail size={24} color="#4CAF50" />
-                <Text style={styles.shareOptionTitle}>Share via Email</Text>
-                <Text style={styles.shareOptionDesc}>Send schedule via email</Text>
-              </TouchableOpacity>
+              <View style={styles.secondaryOptionsGrid}>
+                <TouchableOpacity 
+                  style={styles.shareOptionCard}
+                  onPress={shareViaEmail}
+                >
+                  <Mail size={24} color="#4CAF50" />
+                  <Text style={styles.shareOptionTitle}>Email</Text>
+                  <Text style={styles.shareOptionDesc}>Send via email</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.shareOptionCard}
+                  onPress={() => {
+                    router.push('/share-schedule');
+                  }}
+                >
+                  <FileText size={24} color="#2196F3" />
+                  <Text style={styles.shareOptionTitle}>More Options</Text>
+                  <Text style={styles.shareOptionDesc}>Text, print & more</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
         </View>
@@ -507,10 +520,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontStyle: 'italic',
   },
-  shareOptionsGrid: {
+  shareOptionsContainer: {
+    marginBottom: 20,
+  },
+  primaryShareOption: {
+    backgroundColor: '#FF6B6B',
+    padding: 24,
+    borderRadius: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#FF6B6B',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  primaryShareTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  primaryShareDesc: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.9)',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  secondaryOptionsGrid: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 20,
   },
   shareOptionCard: {
     flex: 1,

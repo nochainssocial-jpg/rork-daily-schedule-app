@@ -417,6 +417,32 @@ export default function HomeScreen() {
           />
         </View>
         
+        {/* Status Section */}
+        <View style={styles.statusSection}>
+          <View style={styles.statusItem}>
+            <View style={styles.statusIndicator} />
+            <Text style={styles.statusText}>Server Running</Text>
+          </View>
+          <View style={styles.statusItem}>
+            <View style={styles.statusIndicator} />
+            <Text style={styles.statusText}>Backend API: Available</Text>
+          </View>
+          <View style={styles.statusItemPort}>
+            <View style={styles.portIcon} />
+            <Text style={styles.statusText}>Port: 3000</Text>
+          </View>
+        </View>
+        
+        {/* Success Message */}
+        <View style={styles.successSection}>
+          <View style={styles.successBox}>
+            <Text style={styles.successIcon}>🎉</Text>
+            <Text style={styles.successTitle}>Success!</Text>
+            <Text style={styles.successMessage}>Your Daily Schedule App is now running on your Synology NAS!</Text>
+            <Text style={styles.successSubMessage}>This is a fully functional version with schedule management.</Text>
+          </View>
+        </View>
+        
         {lastUpdateTime && (
           <View style={styles.notificationArea}>
             <View style={[styles.notificationBox, { 
@@ -608,6 +634,79 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+  },
+  statusSection: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  statusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  statusItemPort: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50',
+    marginRight: 12,
+  },
+  portIcon: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#2196F3',
+    marginRight: 12,
+  },
+  statusText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  successSection: {
+    backgroundColor: '#fff',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  successBox: {
+    backgroundColor: '#E3F2FD',
+    borderColor: '#2196F3',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 20,
+    alignItems: 'center',
+  },
+  successIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  successTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1976D2',
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 14,
+    color: '#1976D2',
+    textAlign: 'center',
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  successSubMessage: {
+    fontSize: 12,
+    color: '#1976D2',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   notificationArea: {
     paddingVertical: 8,

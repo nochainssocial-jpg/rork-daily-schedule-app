@@ -313,6 +313,21 @@ export default function HelpScreen() {
         />
 
         <HelpSection
+          title="Key Features Available"
+          description="All functionality from the original iOS app is available:"
+          items={[
+            "✅ Create Schedule: Full 5-step wizard with staff and participant selection",
+            "✅ Edit Functions: Available for all categories (staff, participants, assignments, etc.)",
+            "✅ Settings: Manage staff, participants, chores, and checklist items",
+            "✅ Share Tab: PDF export, email sharing, and 6-digit code sharing",
+            "✅ View PDF: Complete formatted schedule view with print functionality",
+            "✅ Drop-offs & Pickups: Full transportation management",
+            "✅ Time Slot Management: Front Room, Scotty, and Twins scheduling",
+            "✅ Chore Assignment: Automatic and manual chore distribution"
+          ]}
+        />
+        
+        <HelpSection
           title="Tips for Success"
           description="Get the most out of the app:"
           items={[
@@ -320,14 +335,27 @@ export default function HelpScreen() {
             "Use the Notes section for important reminders",
             "Check the PDF view before sharing to ensure formatting",
             "Schedules are saved automatically as you make changes",
-            "The app works offline - no internet connection required"
+            "The app works offline - no internet connection required",
+            "If changes don't appear, try the Refresh button or restart the browser"
           ]}
         />
         
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Troubleshooting</Text>
           <Text style={styles.sectionDescription}>
-            If you're experiencing issues with data not loading or saving correctly, use these diagnostic tools:
+            If changes don't seem to take effect or you're experiencing issues:
+          </Text>
+          
+          <View style={styles.quickFixSection}>
+            <Text style={styles.quickFixTitle}>Quick Fixes:</Text>
+            <Text style={styles.quickFixItem}>1. Try refreshing the page/app (F5 on web)</Text>
+            <Text style={styles.quickFixItem}>2. Use the Refresh button on the home screen</Text>
+            <Text style={styles.quickFixItem}>3. Clear browser cache if on web</Text>
+            <Text style={styles.quickFixItem}>4. Check that you're creating schedules properly through the 5-step wizard</Text>
+          </View>
+          
+          <Text style={styles.sectionDescription}>
+            For advanced troubleshooting, use these diagnostic tools:
           </Text>
           
           <TouchableOpacity
@@ -577,5 +605,25 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 10,
     marginTop: 4,
+  },
+  quickFixSection: {
+    backgroundColor: '#E8F5E8',
+    padding: 16,
+    borderRadius: 8,
+    marginVertical: 12,
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+  },
+  quickFixTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  quickFixItem: {
+    fontSize: 14,
+    color: '#2E7D32',
+    marginBottom: 4,
+    lineHeight: 20,
   },
 });
