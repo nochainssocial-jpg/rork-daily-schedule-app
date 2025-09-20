@@ -59,6 +59,17 @@ export default function CreateScheduleScreen() {
     });
   };
 
+  const selectAllStaff = () => {
+    const allStaffIds = staff.map((s: Staff) => s.id);
+    setWorkingStaff(allStaffIds);
+    console.log('All staff selected:', allStaffIds.length, 'members');
+  };
+
+  const clearAllStaff = () => {
+    setWorkingStaff([]);
+    console.log('All staff cleared');
+  };
+
   const toggleParticipantSelection = (participantId: string) => {
     setAttendingParticipants(prev => {
       const newSelection = prev.includes(participantId) 
@@ -67,6 +78,20 @@ export default function CreateScheduleScreen() {
       console.log('Participant selection updated:', newSelection.map(id => participants.find(p => p.id === participantId)?.name).join(', '));
       return newSelection;
     });
+  };
+
+  const selectAllParticipants = () => {
+    const validParticipants = participants.filter((participant: Participant) => 
+      participant.name !== 'Everyone'
+    );
+    const allParticipantIds = validParticipants.map((p: Participant) => p.id);
+    setAttendingParticipants(allParticipantIds);
+    console.log('All participants selected:', allParticipantIds.length, 'participants');
+  };
+
+  const clearAllParticipants = () => {
+    setAttendingParticipants([]);
+    console.log('All participants cleared');
   };
 
   const handleBackStep = useCallback(() => {
@@ -206,6 +231,37 @@ export default function CreateScheduleScreen() {
     }));
   };
 
+  const autoAssignParticipants = () => {
+    if (assignments.length === 0 || attendingParticipants.length === 0) return;
+    
+    const unassignedParticipants = attendingParticipants.filter(participantId => {
+      return !assignments.some(assignment => assignment.participantIds.includes(participantId));
+    });
+    
+    if (unassignedParticipants.length === 0) return;
+    
+    // Distribute participants evenly among staff
+    const updatedAssignments = [...assignments];
+    let staffIndex = 0;
+    
+    unassignedParticipants.forEach(participantId => {
+      updatedAssignments[staffIndex].participantIds.push(participantId);
+      staffIndex = (staffIndex + 1) % updatedAssignments.length;
+    });
+    
+    setAssignments(updatedAssignments);
+    console.log('Auto-assigned', unassignedParticipants.length, 'participants');
+  };
+
+  const clearAllAssignments = () => {
+    const clearedAssignments = assignments.map(assignment => ({
+      ...assignment,
+      participantIds: []
+    }));
+    setAssignments(clearedAssignments);
+    console.log('All participant assignments cleared');
+  };
+
   const getStepTitle = () => {
     switch (scheduleStep) {
       case 1: return 'Select Working Staff';
@@ -269,6 +325,21 @@ export default function CreateScheduleScreen() {
       case 1:
         return (
           <View style={styles.selectionContainer}>
+            <View style={styles.bulkActionContainer}>
+              <TouchableOpacity 
+                style={styles.bulkActionButton}
+                onPress={selectAllStaff}
+              >
+                <Text style={styles.bulkActionText}>Select All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.bulkActionButton, styles.bulkActionButtonSecondary]}
+                onPress={clearAllStaff}
+              >
+                <Text style={[styles.bulkActionText, styles.bulkActionTextSecondary]}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+            
             {staff.map((staffMember: Staff) => (
               <TouchableOpacity
                 key={staffMember.id}
@@ -277,6 +348,7 @@ export default function CreateScheduleScreen() {
                   workingStaff.includes(staffMember.id) && styles.selectedItem
                 ]}
                 onPress={() => toggleStaffSelection(staffMember.id)}
+                testID={`staff-${staffMember.id}`}
               >
                 <View style={[styles.colorIndicator, { backgroundColor: staffMember.color }]} />
                 <Text style={[
@@ -301,6 +373,21 @@ export default function CreateScheduleScreen() {
         
         return (
           <View style={styles.selectionContainer}>
+            <View style={styles.bulkActionContainer}>
+              <TouchableOpacity 
+                style={styles.bulkActionButton}
+                onPress={selectAllParticipants}
+              >
+                <Text style={styles.bulkActionText}>Select All</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.bulkActionButton, styles.bulkActionButtonSecondary]}
+                onPress={clearAllParticipants}
+              >
+                <Text style={[styles.bulkActionText, styles.bulkActionTextSecondary]}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+            
             {validParticipants.map((participant: Participant) => (
               <TouchableOpacity
                 key={participant.id}
@@ -309,6 +396,7 @@ export default function CreateScheduleScreen() {
                   attendingParticipants.includes(participant.id) && styles.selectedItem
                 ]}
                 onPress={() => toggleParticipantSelection(participant.id)}
+                testID={`participant-${participant.id}`}
               >
                 <Text style={[
                   styles.selectionText,
@@ -340,13 +428,36 @@ export default function CreateScheduleScreen() {
                 </Text>
               </View>
             )}
+            
+            <View style={styles.assignmentActionsContainer}>
+              <TouchableOpacity 
+                style={styles.assignmentActionButton}
+                onPress={autoAssignParticipants}
+              >
+                <Text style={styles.assignmentActionText}>Auto-Assign Remaining</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.assignmentActionButton, styles.assignmentActionButtonSecondary]}
+                onPress={clearAllAssignments}
+              >
+                <Text style={[styles.assignmentActionText, styles.assignmentActionTextSecondary]}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+            
             {assignments.map(assignment => {
               const staffMember = staff.find((s: Staff) => s.id === assignment.staffId);
+              const assignedCount = assignment.participantIds.length;
+              
               return (
                 <View key={assignment.staffId} style={styles.assignmentGroup}>
                   <View style={styles.staffHeader}>
-                    <View style={[styles.colorIndicator, { backgroundColor: staffMember?.color }]} />
-                    <Text style={styles.staffName}>{staffMember?.name}</Text>
+                    <View style={styles.staffHeaderLeft}>
+                      <View style={[styles.colorIndicator, { backgroundColor: staffMember?.color }]} />
+                      <Text style={styles.staffName}>{staffMember?.name}</Text>
+                    </View>
+                    <View style={styles.assignmentCount}>
+                      <Text style={styles.assignmentCountText}>{assignedCount}</Text>
+                    </View>
                   </View>
                   
                   <View style={styles.participantsList}>
@@ -370,6 +481,7 @@ export default function CreateScheduleScreen() {
                           ]}
                           onPress={() => assignParticipantToStaff(assignment.staffId, participantId)}
                           disabled={isAssignedToOther}
+                          testID={`assign-${assignment.staffId}-${participantId}`}
                         >
                           <Text style={[
                             styles.participantText,
@@ -773,5 +885,78 @@ const styles = StyleSheet.create({
   headerButtonText: {
     color: '#007AFF',
     fontSize: 17,
+  },
+  bulkActionContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 12,
+  },
+  bulkActionButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  bulkActionButtonSecondary: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  bulkActionText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  bulkActionTextSecondary: {
+    color: '#666',
+  },
+  assignmentActionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 12,
+  },
+  assignmentActionButton: {
+    flex: 1,
+    backgroundColor: '#28A745',
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  assignmentActionButtonSecondary: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+  },
+  assignmentActionText: {
+    color: 'white',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  assignmentActionTextSecondary: {
+    color: '#666',
+  },
+  staffHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  assignmentCount: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  assignmentCountText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
