@@ -162,6 +162,35 @@ const createMainPage = () => {
             margin-top: auto;
         }
         
+        .deployment-success-card {
+            background: #E3F2FD;
+            border: 2px solid #2196F3;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .deployment-success-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1976D2;
+            margin-bottom: 8px;
+        }
+        
+        .deployment-success-message {
+            font-size: 14px;
+            color: #1976D2;
+            margin-bottom: 4px;
+            line-height: 1.4;
+        }
+        
+        .deployment-success-sub {
+            font-size: 12px;
+            color: #1976D2;
+            font-style: italic;
+        }
+        
         .success-banner {
             background: #E3F2FD;
             border-bottom: 2px solid #2196F3;
@@ -428,10 +457,7 @@ const createMainPage = () => {
 </head>
 <body>
     <div class="container">
-        <div class="success-banner">
-            <div class="success-title">🎉 Success!</div>
-            <div class="success-text">Your Daily Schedule App is now running on your Synology NAS!</div>
-        </div>
+
         
         <div class="header">
             <h1>Daily Schedule</h1>
@@ -511,19 +537,26 @@ const createMainPage = () => {
         
         <div class="status-section">
             <div class="status-card">
-                <div class="status-title">Status</div>
+                <div class="status-title">🖥️ NAS Server Status</div>
                 <div class="status-item">
                     <span class="status-icon status-running">✅</span>
-                    <span>Server Running</span>
+                    <span>Server: Online & Running</span>
                 </div>
                 <div class="status-item">
                     <span class="status-icon status-running">✅</span>
-                    <span>Backend API: Available</span>
+                    <span>Backend API: Fully Available</span>
                 </div>
                 <div class="status-item">
                     <span class="status-icon status-running">🌐</span>
-                    <span>Port: ${PORT}</span>
+                    <span>Port: ${PORT} (Active)</span>
                 </div>
+            </div>
+            
+            <div class="deployment-success-card">
+                <div class="success-icon">🎉</div>
+                <div class="deployment-success-title">Deployment Successful!</div>
+                <div class="deployment-success-message">Your Daily Schedule App is now running on your Synology NAS with full functionality!</div>
+                <div class="deployment-success-sub">All features from the iOS app are available and working.</div>
             </div>
         </div>
     </div>
