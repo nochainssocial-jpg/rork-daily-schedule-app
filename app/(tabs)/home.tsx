@@ -389,7 +389,10 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Text style={styles.headerTitle}>Daily Schedule</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Daily Schedule</Text>
+          <Text style={styles.headerSubtitle}>NAS Version - Updated</Text>
+        </View>
         <Image 
           source={{ uri: 'https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/sfl62jz9efty7wm6r3s5e' }}
           style={styles.logo}
@@ -417,31 +420,7 @@ export default function HomeScreen() {
           />
         </View>
         
-        {/* Status Section */}
-        <View style={styles.statusSection}>
-          <View style={styles.statusItem}>
-            <View style={styles.statusIndicator} />
-            <Text style={styles.statusText}>Server Running</Text>
-          </View>
-          <View style={styles.statusItem}>
-            <View style={styles.statusIndicator} />
-            <Text style={styles.statusText}>Backend API: Available</Text>
-          </View>
-          <View style={styles.statusItemPort}>
-            <View style={styles.portIcon} />
-            <Text style={styles.statusText}>Port: 3000</Text>
-          </View>
-        </View>
-        
-        {/* Success Message */}
-        <View style={styles.successSection}>
-          <View style={styles.successBox}>
-            <Text style={styles.successIcon}>🎉</Text>
-            <Text style={styles.successTitle}>Success!</Text>
-            <Text style={styles.successMessage}>Your Daily Schedule App is now running on your Synology NAS!</Text>
-            <Text style={styles.successSubMessage}>This is a fully functional version with schedule management.</Text>
-          </View>
-        </View>
+
         
         {lastUpdateTime && (
           <View style={styles.notificationArea}>
@@ -530,6 +509,33 @@ export default function HomeScreen() {
                   <Text style={styles.featureItem}>✓ 6-digit Code Sharing</Text>
                 </View>
                 
+                {/* NAS Status Information - Moved to bottom as requested */}
+                <View style={styles.nasStatusSection}>
+                  <Text style={styles.nasStatusTitle}>🖥️ NAS Server Status</Text>
+                  <View style={styles.statusItem}>
+                    <View style={styles.statusIndicator} />
+                    <Text style={styles.statusText}>Server: Online & Running</Text>
+                  </View>
+                  <View style={styles.statusItem}>
+                    <View style={styles.statusIndicator} />
+                    <Text style={styles.statusText}>Backend API: Fully Available</Text>
+                  </View>
+                  <View style={styles.statusItemPort}>
+                    <View style={styles.portIcon} />
+                    <Text style={styles.statusText}>Port: 3000 (Active)</Text>
+                  </View>
+                </View>
+                
+                {/* Deployment Success Message - Moved to bottom as requested */}
+                <View style={styles.deploymentSuccessSection}>
+                  <View style={styles.deploymentSuccessBox}>
+                    <Text style={styles.successIcon}>🎉</Text>
+                    <Text style={styles.deploymentSuccessTitle}>Deployment Successful!</Text>
+                    <Text style={styles.deploymentSuccessMessage}>Your Daily Schedule App is now running on your Synology NAS with full functionality!</Text>
+                    <Text style={styles.deploymentSuccessSubMessage}>All features from the iOS app are available and working.</Text>
+                  </View>
+                </View>
+                
                 {/* Debug info for development */}
                 {__DEV__ && (
                   <View style={styles.debugContainer}>
@@ -615,10 +621,18 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
+  headerContent: {
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 27,
     fontWeight: 'bold' as const,
     color: '#333',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   logo: {
     width: 45,
@@ -635,12 +649,21 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  statusSection: {
-    backgroundColor: '#fff',
+  nasStatusSection: {
+    backgroundColor: '#E8F5E8',
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#4CAF50',
+  },
+  nasStatusTitle: {
+    fontSize: 16,
+    fontWeight: 'bold' as const,
+    color: '#2E7D32',
+    marginBottom: 12,
+    textAlign: 'center' as const,
   },
   statusItem: {
     flexDirection: 'row',
@@ -670,43 +693,41 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  successSection: {
-    backgroundColor: '#fff',
+  deploymentSuccessSection: {
     paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginTop: 20,
   },
-  successBox: {
+  deploymentSuccessBox: {
     backgroundColor: '#E3F2FD',
     borderColor: '#2196F3',
-    borderWidth: 1,
+    borderWidth: 2,
     borderRadius: 12,
     padding: 20,
     alignItems: 'center',
   },
-  successIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  successTitle: {
+  deploymentSuccessTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: 'bold' as const,
     color: '#1976D2',
     marginBottom: 8,
   },
-  successMessage: {
+  deploymentSuccessMessage: {
     fontSize: 14,
     color: '#1976D2',
-    textAlign: 'center',
+    textAlign: 'center' as const,
     marginBottom: 4,
     lineHeight: 20,
   },
-  successSubMessage: {
+  deploymentSuccessSubMessage: {
     fontSize: 12,
     color: '#1976D2',
-    textAlign: 'center',
-    fontStyle: 'italic',
+    textAlign: 'center' as const,
+    fontStyle: 'italic' as const,
+  },
+  successIcon: {
+    fontSize: 24,
+    marginBottom: 8,
   },
   notificationArea: {
     paddingVertical: 8,
