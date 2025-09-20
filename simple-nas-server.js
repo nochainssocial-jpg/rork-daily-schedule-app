@@ -159,6 +159,28 @@ const createMainPage = () => {
         
         .status-section {
             padding: 20px;
+            margin-top: auto;
+        }
+        
+        .success-banner {
+            background: #E3F2FD;
+            border-bottom: 2px solid #2196F3;
+            padding: 8px 20px;
+            text-align: center;
+        }
+        
+        .success-title {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1976D2;
+            margin: 0;
+        }
+        
+        .success-text {
+            color: #1976D2;
+            font-size: 12px;
+            margin: 2px 0 0 0;
+            line-height: 1.3;
         }
         
         .status-card {
@@ -406,6 +428,11 @@ const createMainPage = () => {
 </head>
 <body>
     <div class="container">
+        <div class="success-banner">
+            <div class="success-title">🎉 Success!</div>
+            <div class="success-text">Your Daily Schedule App is now running on your Synology NAS!</div>
+        </div>
+        
         <div class="header">
             <h1>Daily Schedule</h1>
             <img src="https://pub-e001eb4506b145aa938b5d3badbff6a5.r2.dev/attachments/sfl62jz9efty7wm6r3s5e" 
@@ -423,32 +450,6 @@ const createMainPage = () => {
                 <button class="btn btn-success" onclick="openViewModal()">View Schedules</button>
                 <button class="btn btn-warning" onclick="shareSchedule()">Share Schedule</button>
                 <button class="btn btn-secondary" onclick="settings()">Settings</button>
-            </div>
-        </div>
-        
-        <div class="status-section">
-            <div class="status-card">
-                <div class="status-title">Status</div>
-                <div class="status-item">
-                    <span class="status-icon status-running">✅</span>
-                    <span>Server Running</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-icon status-running">✅</span>
-                    <span>Backend API: Available</span>
-                </div>
-                <div class="status-item">
-                    <span class="status-icon status-running">🌐</span>
-                    <span>Port: ${PORT}</span>
-                </div>
-            </div>
-            
-            <div class="info-card">
-                <div class="info-title">🎉 Success!</div>
-                <div class="info-text">
-                    Your Daily Schedule App is now running on your Synology NAS!<br>
-                    This is a fully functional version with schedule management.
-                </div>
             </div>
         </div>
         
@@ -505,6 +506,24 @@ const createMainPage = () => {
                 <div class="category-icon" style="background: #E56B6F20; color: #E56B6F;">📝</div>
                 <div class="category-title">Final Checklist</div>
                 <div class="category-arrow">→</div>
+            </div>
+        </div>
+        
+        <div class="status-section">
+            <div class="status-card">
+                <div class="status-title">Status</div>
+                <div class="status-item">
+                    <span class="status-icon status-running">✅</span>
+                    <span>Server Running</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon status-running">✅</span>
+                    <span>Backend API: Available</span>
+                </div>
+                <div class="status-item">
+                    <span class="status-icon status-running">🌐</span>
+                    <span>Port: ${PORT}</span>
+                </div>
             </div>
         </div>
     </div>
